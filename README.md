@@ -11,3 +11,6 @@
 8. \[無票自動調整\] 若張數 > 餘票，則調低張數嘗試清空餘票
 
 注：若 \[重複無限次\] \[無票自動調整\] 同時開啟，則餘票為 0 將自動強制停止
+
+![image](https://github.com/IceXinShou/GetTicket/assets/41276723/3f5962a5-b077-42ae-a771-937c6f8f5259)
+![image](https://github.com/IceXinShou/GetTicket/assets/41276723/cf7a6365-a842-4965-a5da-3922fbfb2df0)
