@@ -19,7 +19,7 @@ public class GUI {
         frame.setVisible(true);
     }
 
-    private static final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private static ExecutorService executor;
 
     private static void placeComponents(JPanel panel) {
         panel.setLayout(null);
@@ -111,7 +111,18 @@ public class GUI {
 
         // 添加按鈕的事件監聽器
         button.addActionListener(e -> {
-            button.setEnabled(false);
+            if (executor != null) {
+                executor.shutdownNow();
+            }
+
+            executor = Executors.newSingleThreadExecutor();
+
+            if (outputArea.getText().isEmpty()) {
+                outputArea.setText("開始搶票，結束前請勿再次按下按鈕！\n");
+            } else {
+                outputArea.setText(outputArea.getText() + "\n\n開始搶票，結束前請勿再次按下按鈕！\n");
+            }
+
             int delay_ms = Integer.parseInt(delayField.getText());
             int indexInt = Integer.parseInt((String) index.getSelectedItem());
             int ticketCountInt = Integer.parseInt((String) ticketsCount.getSelectedItem());
@@ -142,8 +153,6 @@ public class GUI {
             } catch (InterruptedException ex) {
                 throw new RuntimeException(ex);
             }
-
-            button.setEnabled(true);
         });
     }
 

@@ -14,12 +14,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class TicketGetter implements Runnable {
-    public static final ExecutorService updater = Executors.newSingleThreadExecutor();
-    private static final ConcurrentLinkedQueue<String> dataQueue = new ConcurrentLinkedQueue<>();
-    private static final ExecutorService areaUpdater = Executors.newSingleThreadExecutor();
+    public static ExecutorService updater;
+    private static ExecutorService areaUpdater;
+    private static ConcurrentLinkedQueue<String> dataQueue;
     private static CountDownLatch countDown;
     private static String formattedURL;
     private static int counter = 1;
+    private static int total = 0;
     private static JTextArea area;
     private static String travel_ID;
     private static String date;
@@ -38,7 +39,11 @@ public class TicketGetter implements Runnable {
             int repeat,
             int delay_ms,
             boolean take_it_all) throws InterruptedException {
+
         countDown = new CountDownLatch(repeat);
+        dataQueue = new ConcurrentLinkedQueue<>();
+        areaUpdater = Executors.newSingleThreadExecutor();
+        updater = Executors.newSingleThreadExecutor();
 
         date = date.replace("/", "")
                 .replace("-", "")
@@ -50,6 +55,8 @@ public class TicketGetter implements Runnable {
         System.out.println("Example URL: " + formattedURL + "\n");
 
 
+        counter = 1;
+        total = 0;
         TicketGetter.area = area;
         TicketGetter.travel_ID = travel_ID;
         TicketGetter.date = date;
@@ -112,12 +119,15 @@ public class TicketGetter implements Runnable {
                     if (rsp == 2) {
                         if (person == 1) {
                             System.out.println("已結束，無餘票");
+                            dataQueue.add(String.format("搶票完成：共搶了 %d 張", total));
+                            countDown = new CountDownLatch(0);
                             return;
                         }
 
                         if (!take_it_all) {
-                            countDown = new CountDownLatch(0);
                             System.out.println("已結束，可能有餘票");
+                            dataQueue.add(String.format("搶票完成：共搶了 %d 張", total));
+                            countDown = new CountDownLatch(0);
                             return;
                         }
 
@@ -147,6 +157,8 @@ public class TicketGetter implements Runnable {
                             data.get("oid").getAsInt(),
                             data.get("verify").getAsString()
                     ));
+
+                    total += person;
                     countDown.countDown();
                     return 0;
                 }
