@@ -6,6 +6,7 @@ import java.text.NumberFormat;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+
 public class GUI {
     public static void main(String[] args) {
         JFrame frame = new JFrame("搶票大師 (Discord: xs._.b)");
@@ -95,7 +96,7 @@ public class GUI {
         numberFormatter.setMinimum(0L);
         delayLabel = new JLabel("延遲(ms)");
         delayField = new JFormattedTextField(numberFormatter);
-        delayField.setText("100");
+        delayField.setText("500");
         delayLabel.setBounds(220, 130, 80, 25);
         delayField.setBounds(280, 130, 60, 25);
         panel.add(delayLabel);
@@ -123,36 +124,54 @@ public class GUI {
                 outputArea.setText(outputArea.getText() + "\n\n開始搶票，結束前請勿再次按下按鈕！\n");
             }
 
-            int delay_ms = Integer.parseInt(delayField.getText());
-            int indexInt = Integer.parseInt((String) index.getSelectedItem());
-            int ticketCountInt = Integer.parseInt((String) ticketsCount.getSelectedItem());
-            int repeatCountInt = infinityCheckBox.isSelected() ?
-                    Integer.MAX_VALUE : Integer.parseInt((String) repeatCount.getSelectedItem());
-            String dateStr = dateField.getText();
-            String travel_ID;
-            String urlText = urlField.getText();
+            if (TicketGetter.DEBUG) {
+                try {
+                    executor.submit(new TicketGetter(
+                            outputArea,
+                            null,
+                            null,
+                            -1,
+                            -1,
+                            1,
+                            500,
+                            false
+                    ));
+                } catch (InterruptedException ex) {
+                    throw new RuntimeException(ex);
+                }
+            } else {
+                int delay_ms = Integer.parseInt(delayField.getText());
+                int indexInt = Integer.parseInt((String) index.getSelectedItem());
+                int ticketCountInt = Integer.parseInt((String) ticketsCount.getSelectedItem());
+                int repeatCountInt = infinityCheckBox.isSelected() ?
+                        Integer.MAX_VALUE : Integer.parseInt((String) repeatCount.getSelectedItem());
+                String dateStr = dateField.getText();
+                String travel_ID;
+                String urlText = urlField.getText();
 
-            if (urlText.endsWith("/")) urlText = urlText.substring(0, urlText.length() - 1);
-            if (urlText.startsWith("https://")) urlText = urlText.substring(8);
-            if (urlText.startsWith("http://")) urlText = urlText.substring(7);
-            String[] default_split = urlText.split("/");
+                if (urlText.endsWith("/")) urlText = urlText.substring(0, urlText.length() - 1);
+                if (urlText.startsWith("https://")) urlText = urlText.substring(8);
+                if (urlText.startsWith("http://")) urlText = urlText.substring(7);
+                String[] default_split = urlText.split("/");
 
-            if (default_split.length == 5 && dateStr.isEmpty()) dateStr = default_split[4];
-            travel_ID = default_split[3];
-            try {
-                executor.submit(new TicketGetter(
-                        outputArea,
-                        travel_ID,
-                        dateStr,
-                        indexInt,
-                        ticketCountInt,
-                        repeatCountInt,
-                        delay_ms,
-                        takeItAllCheckBox.isSelected()
-                ));
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
+                if (default_split.length == 5 && dateStr.isEmpty()) dateStr = default_split[4];
+                travel_ID = default_split[3];
+                try {
+                    executor.submit(new TicketGetter(
+                            outputArea,
+                            travel_ID,
+                            dateStr,
+                            indexInt,
+                            ticketCountInt,
+                            repeatCountInt,
+                            delay_ms,
+                            takeItAllCheckBox.isSelected()
+                    ));
+                } catch (InterruptedException ex) {
+                    throw new RuntimeException(ex);
+                }
             }
+
         });
     }
 
