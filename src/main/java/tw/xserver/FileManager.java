@@ -41,34 +41,18 @@ public class FileManager {
                     .loadAs(inputStream, Config.class);
             inputStream.close();
         } catch (IOException e) {
-            e.printStackTrace();;
-//            Logger.WARNln(e.getMessage());
-//            exit(403);
+            e.printStackTrace();
+            Logger.WARNln(e.getMessage());
+            exit(403);
         } catch (YAMLException e) {
             e.printStackTrace();
-//            e.printStackTrace();;
-//            Logger.WARNln(e.getMessage());
-//            exit(402);
-        }
-    }
-
-    public void verify() throws VerifyException {
-        for (Data i : config.data) {
-            Set<String> ids = new HashSet<>();
-            for (Member member : i.getMembers()) {
-                // 1. 檢查身分證號合法性
-                idCheck(member.id);
-
-                // 2. 檢查身分證號重複性
-                if (ids.contains(member.id))
-                    throw new VerifyException("same id occur");
-                else
-                    ids.add(member.id);
-            }
+            Logger.WARNln(e.getMessage());
+            exit(402);
         }
     }
 
     private static final String CHECK_HEAD = "ABCDEFGHJKLMNPQRSTUVWXYZIO"; // 字母代號對照表
+
     private static void idCheck(String inp) throws VerifyException {
         if (inp.length() != 10) {
             throw new VerifyException("wrong length");
@@ -97,6 +81,21 @@ public class FileManager {
         }
     }
 
+    public void verify() throws VerifyException {
+        for (Data i : config.data) {
+            Set<String> ids = new HashSet<>();
+            for (Member member : i.getMembers()) {
+                // 1. 檢查身分證號合法性
+                idCheck(member.id);
+
+                // 2. 檢查身分證號重複性
+                if (ids.contains(member.id))
+                    throw new VerifyException("same id occur");
+                else
+                    ids.add(member.id);
+            }
+        }
+    }
 
     private File exportResource() {
         try (InputStream fileInJar = getClass().getClassLoader().getResourceAsStream("config.yml")) {

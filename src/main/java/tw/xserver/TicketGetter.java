@@ -19,7 +19,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class TicketGetter implements Runnable {
-    public static final boolean DEBUG = true;
     private static ConcurrentLinkedQueue<Data> inputQueue;
     private static ConcurrentLinkedQueue<String> outputQueue;
     private static ConcurrentLinkedQueue<Connection> sendReq;
@@ -157,9 +156,7 @@ public class TicketGetter implements Runnable {
                     }
 
                     Thread.sleep(config.send_delay);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                } catch (IOException e) {
+                } catch (InterruptedException | IOException e) {
                     throw new RuntimeException(e);
                 }
             }

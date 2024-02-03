@@ -16,6 +16,7 @@ import static java.lang.System.exit;
 public class GUI {
     public static final String ROOT_PATH = new File(System.getProperty("user.dir")).toString() + '/';
     private static FileManager manager;
+    private static ExecutorService executor;
 
     public static void main(String[] args) {
         frame = new JFrame("搶票大師 (Discord: xs._.b)");
@@ -29,8 +30,6 @@ public class GUI {
 
         frame.setVisible(true);
     }
-
-    private static ExecutorService executor;
 
     private static void placeComponents(JPanel panel) {
         panel.setLayout(null);

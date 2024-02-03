@@ -7,7 +7,6 @@ public class Config {
     public long send_delay;
     public Guide guide;
     public Data[] data;
-    public LocalDateTime begin_datetime;
 
     public LocalDateTime getDateTime() {
         return LocalDateTime.parse(begin_time);

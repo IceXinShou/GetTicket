@@ -11,22 +11,6 @@ public class Logger {
         this.ERRTAG = Color.RESET + '[' + Color.RED + TAG + Color.RESET + ']' + ' ';
     }
 
-    public void logln(final String msg) {
-        System.out.println('[' + new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime()) + "] " + TAG + msg);
-    }
-
-    public void log(final String msg) {
-        System.out.print('[' + new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime()) + "] " + TAG + msg);
-    }
-
-    public void warnln(final String msg) {
-        System.err.println('[' + new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime()) + "] " + ERRTAG + msg);
-    }
-
-    public void warn(final String msg) {
-        System.err.print('[' + new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime()) + "] " + ERRTAG + msg);
-    }
-
     public static void LOGln(final String msg) {
         System.out.println('[' + new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime()) + "] " + msg);
     }
@@ -41,5 +25,21 @@ public class Logger {
 
     public static void WARN(final String msg) {
         System.err.print('[' + new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime()) + "] " + msg);
+    }
+
+    public void logln(final String msg) {
+        System.out.println('[' + new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime()) + "] " + TAG + msg);
+    }
+
+    public void log(final String msg) {
+        System.out.print('[' + new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime()) + "] " + TAG + msg);
+    }
+
+    public void warnln(final String msg) {
+        System.err.println('[' + new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime()) + "] " + ERRTAG + msg);
+    }
+
+    public void warn(final String msg) {
+        System.err.print('[' + new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime()) + "] " + ERRTAG + msg);
     }
 }
