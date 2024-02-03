@@ -2,12 +2,17 @@ package tw.xserver;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import org.jsoup.Connection;
 import org.jsoup.Jsoup;
+import tw.xserver.Object.Config;
+import tw.xserver.Object.Data;
+import tw.xserver.utils.logger.Logger;
 
 import javax.swing.*;
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -15,137 +20,42 @@ import java.util.concurrent.Executors;
 
 public class TicketGetter implements Runnable {
     public static final boolean DEBUG = true;
-    private static final String rawData = "" +
-            "03/01 20\n" +
-            "03/01 20\n" +
-            "03/02 20\n" +
-            "03/02 20\n" +
-            "03/02 20\n" +
-            "03/02 20\n" +
-            "03/03 20\n" +
-            "03/03 20\n" +
-            "03/03 20\n" +
-            "03/03 20\n" +
-            "03/05 20\n" +
-            "03/05 20\n" +
-            "03/07 20\n" +
-            "03/07 16\n" +
-            "03/08 20\n" +
-            "03/08 20\n" +
-            "03/09 20\n" +
-            "03/09 20\n" +
-            "03/09 20\n" +
-            "03/09 20\n" +
-            "03/09 20\n" +
-            "03/09 20\n" +
-            "03/09 2\n" +
-
-            "03/10 20\n" +
-            "03/10 20\n" +
-            "03/15 20\n" +
-            "03/15 20\n" +
-            "03/16 20\n" +
-            "03/16 20\n" +
-            "03/16 20\n" +
-            "03/16 20\n" +
-            "03/17 6\n" +
-            "03/17 20\n" +
-            "03/17 20\n" +
-            "03/17 20\n" +
-            "03/22 20\n" +
-            "03/22 20\n" +
-            "03/23 20\n" +
-            "03/23 20\n" +
-            "03/23 20\n" +
-            "03/23 20\n" +
-            "03/24 20\n" +
-            "03/24 20\n" +
-            "03/24 20\n" +
-            "03/24 20\n" +
-            "03/24 20\n" +
-            "03/24 20\n" +
-            "03/24 2\n" +
-            "03/25 20\n" +
-            "03/25 20\n" +
-            "03/29 20\n" +
-            "03/29 20\n" +
-            "03/30 20\n" +
-            "03/30 20\n" +
-            "03/31 20\n" +
-            "03/31 20\n" ;
-
-    private static ConcurrentLinkedQueue<Pair<String, Integer>> inputQueue;
+    private static ConcurrentLinkedQueue<Data> inputQueue;
+    private static ConcurrentLinkedQueue<String> outputQueue;
+    private static ConcurrentLinkedQueue<Connection> sendReq;
     private static ExecutorService connector;
     private static ExecutorService areaUpdater;
-    private static ConcurrentLinkedQueue<String> outputQueue;
     private static CountDownLatch countDown;
-    private static String formattedURL;
     private static int counter = 1;
     private static int total = 0;
     private static JTextArea area;
-    private static String travel_ID;
-    private static String date;
-    private static int type_index;
-    private static int person;
-    private static int delay_ms = 500;
-    private static boolean take_it_all;
+    private static Config config;
 
 
-    public TicketGetter(
-            JTextArea area,
-            String travel_ID,
-            String date,
-            int type_index,
-            int person,
-            int repeat,
-            int delay_ms,
-            boolean take_it_all) throws InterruptedException {
-
-        counter = 1;
-        total = 0;
-        countDown = new CountDownLatch(repeat);
+    public TicketGetter(Config config, JTextArea area) {
+        countDown = new CountDownLatch(1);
+        inputQueue = new ConcurrentLinkedQueue<>();
         outputQueue = new ConcurrentLinkedQueue<>();
+        sendReq = new ConcurrentLinkedQueue<>();
         areaUpdater = Executors.newSingleThreadExecutor();
         connector = Executors.newSingleThreadExecutor();
-        inputQueue = new ConcurrentLinkedQueue<>();
+        TicketGetter.config = config;
         TicketGetter.area = area;
 
-        if (DEBUG) {
-            for (String i : rawData.split("\n")) {
-                if (i.isEmpty()) continue;
-
-                String rawDate = i.split(" ")[0];
-                int rawCount = Integer.parseInt(i.split(" ")[1]);
-                inputQueue.add(new Pair<>(
-                        "2024" + rawDate.replace("/", "") + "02",
-                        rawCount
-                ));
+        for (Data i : config.data) {
+            for (int j = 0; j < i.members.length; j += 20) {
+                Data d = new Data();
+                d.date = i.date;
+                d.members = Arrays.copyOfRange(i.members, j, Math.min(20, i.members.length - j));
+                inputQueue.add(d);
             }
-        } else {
-            date = date.replace("/", "")
-                    .replace("-", "")
-                    .replace(".", "")
-                    .replace(" ", "");
-            formattedURL = String.format("https://travel.wutai.gov.tw/Signup/CreateOrder/%s%s%02d/%d",
-                    travel_ID, date, type_index, person
-            );
-            System.out.println("Example URL: " + formattedURL + "\n");
-
-
-            TicketGetter.area = area;
-            TicketGetter.travel_ID = travel_ID;
-            TicketGetter.date = date;
-            TicketGetter.type_index = type_index;
-            TicketGetter.person = person;
-            TicketGetter.delay_ms = delay_ms;
-            TicketGetter.take_it_all = take_it_all;
         }
     }
 
     @Override
     public void run() {
         areaUpdater.submit(new AreaUpdater(area));
-        connector.submit(new Connector(formattedURL));
+        connector.submit(new Connector());
 
         try {
             countDown.await();
@@ -179,111 +89,98 @@ public class TicketGetter implements Runnable {
     }
 
     static class Connector implements Runnable {
-        private String formattedURL;
-
-        public Connector(String formattedURL) {
-            this.formattedURL = formattedURL;
-        }
-
         @Override
         public void run() {
-            if (DEBUG) {
-                while (!inputQueue.isEmpty()) {
-                    Pair<String, Integer> rawData = inputQueue.peek();
-
-                    formattedURL = String.format("https://travel.wutai.gov.tw/Signup/CreateOrder/HYCDEMO%s/%d",
-                            rawData.getFirst(), rawData.getSecond()
-                    );
-
-                    System.out.println(getTime() + ' ' + formattedURL);
-
-                    try {
-                        JsonObject data = JsonParser.parseString(Jsoup.connect(formattedURL).execute().body()).getAsJsonObject();
-                        int rsp = processRsp(data);
-
-                        System.out.println(getTime() + " " + data);
-                        if (rsp == 0) {
-                            System.out.printf(getTime() + " OK 成功: %s %d\n", rawData.getFirst(), rawData.getSecond());
-                            System.out.printf(getTime() + " https://travel.wutai.gov.tw/Signup/Users/%d/%s%n%n\n\n", data.get("oid").getAsInt(), data.get("verify").getAsString());
-                            outputQueue.add(String.format("%02d: %s [%s] [%02d 人]\n https://travel.wutai.gov.tw/Signup/Users/%d/%s%n",
-                                    counter++,
-                                    getTime(),
-                                    rawData.getFirst(),
-                                    rawData.getSecond(),
-                                    data.get("oid").getAsInt(),
-                                    data.get("verify").getAsString()
-                            ));
-
-                            inputQueue.poll();
-                            ++total;
-                        } else if (rsp == 2) {
-                            System.out.printf(getTime() + " FAIL 失敗: %s %d\n\n", rawData.getFirst(), rawData.getSecond());
-                            outputQueue.add(getTime() + String.format(" FAIL 失敗: %s %d", rawData.getFirst(), rawData.getSecond()));
-                            inputQueue.poll();
-                        } else if (rsp == 1) {
-                            inputQueue.add(inputQueue.poll());
-                        }
-
-                        Thread.sleep(delay_ms);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
+            while (true) {
+                if (LocalDateTime.now().isAfter(config.getDateTime())) {
+                    Logger.LOGln("RUN");
+                    break;
                 }
-
-                System.out.println(getTime() + " 已結束，搶票完成：共搶了 " + total + " 單");
-                outputQueue.add(String.format(getTime() + " 搶票完成：共搶了 %d 單", total));
-
-            } else {
-                while (true) {
-                    try {
-                        JsonObject data = JsonParser.parseString(Jsoup.connect(formattedURL).execute().body()).getAsJsonObject();
-                        int rsp = processRsp(data);
-
-                        System.out.println(getTime() + " " + data);
-                        if (rsp == 0) {
-                            System.out.printf("https://travel.wutai.gov.tw/Signup/Users/%d/%s%n%n", data.get("oid").getAsInt(), data.get("verify").getAsString());
-                            outputQueue.add(String.format("%02d: %s [%s] [%02d 人]\n https://travel.wutai.gov.tw/Signup/Users/%d/%s%n",
-                                    counter++,
-                                    getTime(),
-                                    date,
-                                    person,
-                                    data.get("oid").getAsInt(),
-                                    data.get("verify").getAsString()
-                            ));
-                            total += person;
-                            countDown.countDown();
-
-                        } else if (rsp == 2) {
-                            if (person == 1) {
-                                System.out.println("已結束，無餘票");
-                                outputQueue.add(String.format("搶票完成：共搶了 %d 張", total));
-                                countDown = new CountDownLatch(0);
-                                return;
-                            }
-
-                            if (!take_it_all) {
-                                System.out.println("已結束，可能有餘票");
-                                outputQueue.add(String.format("搶票完成：共搶了 %d 張", total));
-                                countDown = new CountDownLatch(0);
-                                return;
-                            }
-
-                            formattedURL = String.format("https://travel.wutai.gov.tw/Signup/CreateOrder/%s%s%02d/%d",
-                                    travel_ID, date, type_index, 1
-                            );
-                            person = 1; // 開始處理餘票
-                        }
-
-                        Thread.sleep(delay_ms);
-                    } catch (IOException e) {
-                        countDown.countDown();
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
                 }
             }
+
+            while (!inputQueue.isEmpty()) {
+                Data rawData = inputQueue.peek();
+                String formattedURL = String.format("https://travel.wutai.gov.tw/Signup/CreateOrder/HYCDEMO%s02/%d",
+                        rawData.date.replace("/", ""), rawData.members.length
+                );
+
+
+                Logger.LOGln("----------------------------------------");
+                Logger.LOGln(formattedURL);
+
+                try {
+                    Connection.Response rsp = Jsoup.connect(formattedURL).execute();
+                    Map<String, String> cookies = rsp.cookies();
+                    System.out.println(cookies);
+
+                    JsonObject rspJson = JsonParser.parseString(rsp.body()).getAsJsonObject();
+
+                    int rspIndex = processRsp(rspJson);
+                    Logger.LOGln(rspJson.toString());
+
+                    if (rspIndex == 0) {
+                        int oid = rspJson.get("oid").getAsInt();
+                        String verify = rspJson.get("verify").getAsString();
+                        String url = String.format("https://travel.wutai.gov.tw/Signup/Users/%d/%s", oid, verify);
+                        Logger.LOGln("OK 成功: " + rawData.date + ' ' + rawData.members.length);
+                        Logger.LOGln(url);
+
+
+                        sendReq.add(Jsoup.connect(url)
+                                .method(Connection.Method.POST)
+                                .referrer(url)
+                                .cookies(cookies)
+                                .data(rawData.parsePostData(config.guide))
+                                .data("id", String.valueOf(rspJson.get("oid").getAsInt()))
+                                .data("Verify", String.valueOf(rspJson.get("verify").getAsString())));
+
+                        outputQueue.add(String.format("%02d: [%s] [%02d] %s",
+                                counter++,
+                                rawData.date.substring(5, 10),
+                                rawData.members.length,
+                                url
+                        ));
+
+                        inputQueue.poll();
+                        ++total;
+                    } else if (rspIndex == 2) {
+                        Logger.LOGln("FAIL 失敗: " + rawData.date.substring(4, 8) + ' ' + rawData.members.length);
+                        outputQueue.add(String.format(" FAIL 失敗: %s %d", rawData.date.substring(4, 8), rawData.members.length));
+                        inputQueue.poll();
+                    } else if (rspIndex == 1) {
+                        inputQueue.add(inputQueue.poll());
+                    }
+
+                    Thread.sleep(config.send_delay);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            Logger.LOGln(String.format("搶票完成：共搶了 %d 單", total));
+            Logger.LOGln("正在填寫資料...");
+            outputQueue.add(String.format("搶票完成：共搶了 %d 單", total));
+            outputQueue.add("正在填寫資料...");
+
+            while (!sendReq.isEmpty()) {
+                try {
+                    Connection.Response rsp = sendReq.poll().execute();
+                    outputQueue.add(String.valueOf(rsp.url().toString()));
+                    Thread.sleep(100);
+                } catch (IOException | InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            outputQueue.add(String.format("搶票完成：共搶了 %d 單", total));
+            outputQueue.add("資料填寫完成");
         }
 
         int processRsp(JsonObject data) {
@@ -306,10 +203,6 @@ public class TicketGetter implements Runnable {
                     return -1;
                 }
             }
-        }
-
-        String getTime() {
-            return String.format("[%-12s]", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_TIME)).replace(' ', '0');
         }
     }
 }

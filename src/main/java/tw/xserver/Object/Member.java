@@ -1,0 +1,33 @@
+package tw.xserver.Object;
+
+public class Member {
+    public String name;
+    public String nationality;
+    public String id;
+    public int birth_y;
+    public int birth_m;
+    public int birth_d;
+    public String food;
+
+    public Member(String name, String id, int birthday_y, int birthday_m, int birthday_d) {
+        this.name = name;
+        this.id = id;
+        this.birth_y = birthday_y;
+        this.birth_m = birthday_m;
+        this.birth_d = birthday_d;
+
+        this.nationality = "Taiwan";
+        this.food = "葷食";
+    }
+
+    @Override
+    public String toString() {
+        return "Member{" +
+                "name='" + name + '\'' +
+                ", year='" + birth_y + '\'' +
+                ", month='" + birth_m + '\'' +
+                ", day='" + birth_d + '\'' +
+                ", id='" + id + '\'' +
+                '}';
+    }
+}

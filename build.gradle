@@ -14,4 +14,5 @@ dependencies {
     implementation group: 'org.jsoup', name: 'jsoup', version: '1.17.2'
     implementation group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
     implementation group: 'org.swinglabs', name: 'swingx', version: '1.6.1'
+    implementation group: 'org.yaml', name: 'snakeyaml', version: '2.2'
 }

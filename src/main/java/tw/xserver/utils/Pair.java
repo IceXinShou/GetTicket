@@ -1,4 +1,4 @@
-package tw.xserver;
+package tw.xserver.utils;
 
 public class Pair<T, U> {
 

@@ -1,0 +1,27 @@
+begin_time: 2024-03-01T07:59:55
+send_delay: 300
+
+guide:
+  contact_name: 測試名
+  nationality: Taiwan
+  contact_id: A112439281
+  contact_tel: 0900000000
+  contact_birth_y: 80
+  contact_birth_m: 8
+  contact_birth_d: 8
+  contact_email: abc@gmail.com
+  bank: 銀行
+  sub_bank: 某銀行
+  bank_account: 0123456789
+  bank_name: 帳號名字
+
+data:
+  - date: 2024/02/19
+    members:
+      - A150592876 測試一 80.01.01
+      - A150592876 測試二 92.02.02
+
+  - date: 2024/02/22
+    members:
+      - A149909374 測試三 93.03.03
+      - A104095962 測試四 94.04.04
