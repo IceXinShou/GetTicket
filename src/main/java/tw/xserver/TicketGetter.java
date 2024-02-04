@@ -51,10 +51,13 @@ public class TicketGetter implements Runnable {
         post_total = 0;
 
         for (Data i : config.data) {
-            for (int j = 0; j < i.members.length; j += 20) {
+            for (int j = 0; j < i.member_count; j += 20) {
                 Data d = new Data();
                 d.date = i.date;
-                d.members = Arrays.copyOfRange(i.members, j, Math.min(20, i.members.length - j));
+                d.member_count = Math.min(20, i.member_count - j);
+                if (i.members != null)
+                    d.members = Arrays.copyOfRange(i.members, j, Math.min(20, i.member_count - j));
+
                 inputQueue.add(d);
             }
         }
@@ -114,12 +117,12 @@ public class TicketGetter implements Runnable {
             while (!inputQueue.isEmpty()) {
                 Data rawData = inputQueue.peek();
                 String formattedURL = String.format("https://travel.wutai.gov.tw/Signup/CreateOrder/HYCDEMO%s02/%d",
-                        rawData.date.replace("/", ""), rawData.members.length
+                        rawData.date.replace("/", ""), rawData.member_count
                 );
 
 
                 Logger.LOGln("----------------------------------------");
-                Logger.LOGln(formattedURL);
+                Logger.LOGln("REQ: " + formattedURL);
 
                 try {
                     Connection.Response rsp = Jsoup.connect(formattedURL).execute();
@@ -132,8 +135,8 @@ public class TicketGetter implements Runnable {
                             int oid = rspJson.get("oid").getAsInt();
                             String verify = rspJson.get("verify").getAsString();
                             String url = String.format("https://travel.wutai.gov.tw/Signup/Users/%d/%s", oid, verify);
-                            Logger.LOGln("OK 成功: " + rawData.date + ' ' + rawData.members.length);
-                            Logger.LOGln(url);
+                            Logger.LOGln("OK 成功: " + rawData.date + ' ' + rawData.member_count);
+                            Logger.LOGln("表單連結: " + url);
 
                             if (rawData.parsePostData(config.guide) != null) {
                                 sendReq.add(Jsoup.connect(url)
@@ -148,7 +151,7 @@ public class TicketGetter implements Runnable {
                             outputQueue.add(String.format("%02d: (%s) [%02d] %s",
                                     counter++,
                                     rawData.date.substring(5, 10),
-                                    rawData.members.length,
+                                    rawData.member_count,
                                     url
                             ));
 
@@ -158,14 +161,14 @@ public class TicketGetter implements Runnable {
                         }
 
                         case 2: {
-                            Logger.LOGln("FAIL 失敗: " + rawData.date.substring(4, 8) + ' ' + rawData.members.length);
-                            outputQueue.add(String.format(" FAIL 失敗: %s %d", rawData.date.substring(4, 8), rawData.members.length));
+                            Logger.WARNln("FAIL 失敗: " + rawData.date.substring(4, 8) + ' ' + rawData.member_count);
+                            outputQueue.add(String.format(" FAIL 失敗: %s %d", rawData.date.substring(4, 8), rawData.member_count));
                             inputQueue.poll();
                             break;
                         }
 
                         case 1: {
-                            inputQueue.add(inputQueue.poll());
+//                            inputQueue.add(inputQueue.poll());
                             break;
                         }
                     }
@@ -182,6 +185,7 @@ public class TicketGetter implements Runnable {
             outputQueue.add("正在填寫資料...");
 
             while (!sendReq.isEmpty()) {
+                Logger.LOGln("----------------------------------------");
                 try {
                     Connection.Response rsp = sendReq.poll().execute();
 
@@ -191,7 +195,7 @@ public class TicketGetter implements Runnable {
                         ++post_total;
                     } else {
                         outputQueue.add("失敗: " + rsp.url().toString());
-                        Logger.LOGln("失敗: " + rsp.url().toString());
+                        Logger.WARNln("失敗: " + rsp.url().toString());
                         Logger.WARNln(prettyPrintHTML(rsp.body()).replace("\n", ""));
                     }
 

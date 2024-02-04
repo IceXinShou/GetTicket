@@ -50,6 +50,8 @@ public class FileManager {
             Logger.WARNln(e.getMessage());
             exit(402);
         }
+
+        config.init();
     }
 
     private static void idCheck(String inp) throws VerifyException {
@@ -82,11 +84,17 @@ public class FileManager {
 
     public void verify() throws VerifyException {
         for (Data i : config.data) {
-            Set<String> ids = new HashSet<>();
-            if (i.getMembersAry() == null) {
-                return;
+            if (i.members == null) {
+                if (i.member_count == null) {
+                    Logger.WARNln("至少要填寫一個 member_count 或 members 參數！");
+                    exit(404);
+                }
+
+                Logger.LOGln("SKIP: " + i.date + ", member count: " + i.member_count);
+                continue;
             }
 
+            Set<String> ids = new HashSet<>();
             for (Member member : i.getMembersAry()) {
                 // 1. 檢查身分證號合法性
                 idCheck(member.id);

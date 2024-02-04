@@ -8,16 +8,26 @@ public class Config {
     public Guide guide;
     public Data[] data;
 
+    public void init() {
+        for (Data d : data) d.getMembersAry();
+    }
+
     public LocalDateTime getDateTime() {
         return LocalDateTime.parse(begin_time);
     }
 
     @Override
     public String toString() {
-        StringBuilder builder = new StringBuilder();
+        int total_member = 0;
+        int total_days = data.length;
+        int total_split_count = 0;
 
+        StringBuilder builder = new StringBuilder();
         builder
-                .append("主要聯絡人資訊：")
+                .append("開始時間：").append(getDateTime().toString()).append('\n')
+                .append("封包延遲：").append(send_delay).append(" ms").append('\n')
+                
+                .append("\n\n主要聯絡人資訊：")
                 .append("\n  姓名：").append(guide.contact_name)
                 .append("\n  國籍：").append(guide.nationality.equals("Taiwan") ? "本國國籍" : "非本國國籍")
                 .append("\n  身分證字號：").append(guide.contact_id)
@@ -35,10 +45,15 @@ public class Config {
         for (Data i : data) {
             builder.append("\n\n日期：").append(i.date);
 
+            total_member += i.member_count;
+            total_split_count += (i.member_count / 20) + ((i.member_count % 20 == 0) ? 0 : 1);
             if (i.getMembersAry() == null) {
-                builder.append("\n成員數：").append(i.members.length);
+                builder
+                        .append(" [僅取得報名連結]")
+                        .append("\n成員數：").append(i.member_count).append('\n');
             } else {
-                for (int j = 0; j < i.members.length; j++) {
+                builder.append(" [自動填寫報名表]");
+                for (int j = 0; j < i.member_count; j++) {
                     Member member = i.getMembersAry()[j];
 
                     builder
@@ -55,6 +70,12 @@ public class Config {
                 }
             }
         }
+
+        builder.insert(0,
+                "成員總數：" + total_member + '\n' +
+                        "天數：" + total_days + '\n' +
+                        "單數：" + total_split_count + "\n\n"
+        );
 
         return builder.toString();
     }

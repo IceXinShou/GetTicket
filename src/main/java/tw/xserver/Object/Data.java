@@ -7,14 +7,16 @@ import java.util.Map;
 public class Data {
     public String date;
     public String[] members;
+    public Integer member_count;
     public Member[] membersAry;
 
     public Member[] getMembersAry() {
         if (membersAry != null) return membersAry;
+        if (members == null) return null;
 
-        Member[] members_ret = new Member[members.length];
-
-        for (int i = 0; i < members.length; i++) {
+        member_count = members.length;
+        Member[] members_ret = new Member[member_count];
+        for (int i = 0; i < member_count; i++) {
             String[] cur = members[i].split(" ");
             if (cur.length != 3) return null;
 
@@ -27,14 +29,14 @@ public class Data {
     }
 
     public Map<String, String> parsePostData(Guide guide) {
-        if (members.length > 20 || getMembersAry() == null) {
+        if (member_count > 20 || getMembersAry() == null) {
             return null;
         }
 
         Map<String, String> ret = new HashMap<>();
 
         ret.put("iAgress", String.valueOf(1));
-        ret.put("qty", String.valueOf(members.length));
+        ret.put("qty", String.valueOf(member_count));
         ret.put("ContactName", guide.contact_name);
         ret.put("nationality", guide.nationality);
         ret.put("ContactUserId", guide.contact_id);
@@ -49,7 +51,7 @@ public class Data {
         ret.put("BankAccount", guide.bank_account);
         ret.put("BankName", guide.bank_name);
 
-        for (int i = 0; i < members.length; i++) {
+        for (int i = 0; i < member_count; i++) {
             ret.put("Name_" + i, getMembersAry()[i].name);
             ret.put("nationality_UserId_" + i, getMembersAry()[i].nationality);
             ret.put("UserId_" + i, getMembersAry()[i].id);
@@ -69,7 +71,7 @@ public class Data {
     public String toString() {
         StringBuilder builder = new StringBuilder().append(date).append(": ");
         if (getMembersAry() == null)
-            return String.valueOf(members.length);
+            return String.valueOf(member_count);
 
         for (Member i : getMembersAry()) {
             builder.append(i).append('\n');
