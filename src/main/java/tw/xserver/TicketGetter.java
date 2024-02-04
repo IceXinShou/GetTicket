@@ -161,9 +161,9 @@ public class TicketGetter implements Runnable {
                         }
 
                         case 2: {
-                            Logger.WARNln("FAIL 失敗: " + rawData.date.substring(4, 8) + ' ' + rawData.member_count);
-                            outputQueue.add(String.format(" FAIL 失敗: %s %d", rawData.date.substring(4, 8), rawData.member_count));
-                            inputQueue.poll();
+                            Logger.WARNln("FAIL 失敗: " + rawData.date.substring(5, 10) + ' ' + rawData.member_count);
+                            outputQueue.add(String.format(" FAIL 失敗: %s %d", rawData.date.substring(5, 10), rawData.member_count));
+                            inputQueue.add(inputQueue.poll());
                             break;
                         }
 
