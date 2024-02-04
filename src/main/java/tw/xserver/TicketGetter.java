@@ -4,12 +4,17 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
+import org.w3c.dom.Document;
+import org.w3c.tidy.Tidy;
 import tw.xserver.Object.Config;
 import tw.xserver.Object.Data;
 import tw.xserver.utils.logger.Logger;
 
 import javax.swing.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Map;
@@ -25,8 +30,9 @@ public class TicketGetter implements Runnable {
     private static ExecutorService connector;
     private static ExecutorService areaUpdater;
     private static CountDownLatch countDown;
-    private static int counter = 1;
-    private static int total = 0;
+    private static int counter;
+    private static int get_total;
+    private static int post_total;
     private static JTextArea area;
     private static Config config;
 
@@ -40,6 +46,9 @@ public class TicketGetter implements Runnable {
         connector = Executors.newSingleThreadExecutor();
         TicketGetter.config = config;
         TicketGetter.area = area;
+        counter = 1;
+        get_total = 0;
+        post_total = 0;
 
         for (Data i : config.data) {
             for (int j = 0; j < i.members.length; j += 20) {
@@ -115,44 +124,50 @@ public class TicketGetter implements Runnable {
                 try {
                     Connection.Response rsp = Jsoup.connect(formattedURL).execute();
                     Map<String, String> cookies = rsp.cookies();
-                    System.out.println(cookies);
-
                     JsonObject rspJson = JsonParser.parseString(rsp.body()).getAsJsonObject();
-
-                    int rspIndex = processRsp(rspJson);
                     Logger.LOGln(rspJson.toString());
 
-                    if (rspIndex == 0) {
-                        int oid = rspJson.get("oid").getAsInt();
-                        String verify = rspJson.get("verify").getAsString();
-                        String url = String.format("https://travel.wutai.gov.tw/Signup/Users/%d/%s", oid, verify);
-                        Logger.LOGln("OK 成功: " + rawData.date + ' ' + rawData.members.length);
-                        Logger.LOGln(url);
+                    switch (processRsp(rspJson)) {
+                        case 0: {
+                            int oid = rspJson.get("oid").getAsInt();
+                            String verify = rspJson.get("verify").getAsString();
+                            String url = String.format("https://travel.wutai.gov.tw/Signup/Users/%d/%s", oid, verify);
+                            Logger.LOGln("OK 成功: " + rawData.date + ' ' + rawData.members.length);
+                            Logger.LOGln(url);
 
+                            if (rawData.parsePostData(config.guide) != null) {
+                                sendReq.add(Jsoup.connect(url)
+                                        .method(Connection.Method.POST)
+                                        .referrer(url)
+                                        .cookies(cookies)
+                                        .data(rawData.parsePostData(config.guide))
+                                        .data("id", String.valueOf(rspJson.get("oid").getAsInt()))
+                                        .data("Verify", rspJson.get("verify").getAsString()));
+                            }
 
-                        sendReq.add(Jsoup.connect(url)
-                                .method(Connection.Method.POST)
-                                .referrer(url)
-                                .cookies(cookies)
-                                .data(rawData.parsePostData(config.guide))
-                                .data("id", String.valueOf(rspJson.get("oid").getAsInt()))
-                                .data("Verify", String.valueOf(rspJson.get("verify").getAsString())));
+                            outputQueue.add(String.format("%02d: (%s) [%02d] %s",
+                                    counter++,
+                                    rawData.date.substring(5, 10),
+                                    rawData.members.length,
+                                    url
+                            ));
 
-                        outputQueue.add(String.format("%02d: [%s] [%02d] %s",
-                                counter++,
-                                rawData.date.substring(5, 10),
-                                rawData.members.length,
-                                url
-                        ));
+                            inputQueue.poll();
+                            ++get_total;
+                            break;
+                        }
 
-                        inputQueue.poll();
-                        ++total;
-                    } else if (rspIndex == 2) {
-                        Logger.LOGln("FAIL 失敗: " + rawData.date.substring(4, 8) + ' ' + rawData.members.length);
-                        outputQueue.add(String.format(" FAIL 失敗: %s %d", rawData.date.substring(4, 8), rawData.members.length));
-                        inputQueue.poll();
-                    } else if (rspIndex == 1) {
-                        inputQueue.add(inputQueue.poll());
+                        case 2: {
+                            Logger.LOGln("FAIL 失敗: " + rawData.date.substring(4, 8) + ' ' + rawData.members.length);
+                            outputQueue.add(String.format(" FAIL 失敗: %s %d", rawData.date.substring(4, 8), rawData.members.length));
+                            inputQueue.poll();
+                            break;
+                        }
+
+                        case 1: {
+                            inputQueue.add(inputQueue.poll());
+                            break;
+                        }
                     }
 
                     Thread.sleep(config.send_delay);
@@ -161,23 +176,33 @@ public class TicketGetter implements Runnable {
                 }
             }
 
-            Logger.LOGln(String.format("搶票完成：共搶了 %d 單", total));
+            Logger.LOGln(String.format("搶票完成，共搶了 %d 單", get_total));
+            outputQueue.add(String.format("搶票完成，共搶了 %d 單", get_total));
             Logger.LOGln("正在填寫資料...");
-            outputQueue.add(String.format("搶票完成：共搶了 %d 單", total));
             outputQueue.add("正在填寫資料...");
 
             while (!sendReq.isEmpty()) {
                 try {
                     Connection.Response rsp = sendReq.poll().execute();
-                    outputQueue.add(String.valueOf(rsp.url().toString()));
+
+                    if (rsp.url().toString().contains("OrderComplete")) {
+                        outputQueue.add(rsp.url().toString());
+                        Logger.LOGln(rsp.url().toString());
+                        ++post_total;
+                    } else {
+                        outputQueue.add("失敗: " + rsp.url().toString());
+                        Logger.LOGln("失敗: " + rsp.url().toString());
+                        Logger.WARNln(prettyPrintHTML(rsp.body()).replace("\n", ""));
+                    }
+
                     Thread.sleep(100);
                 } catch (IOException | InterruptedException e) {
                     throw new RuntimeException(e);
                 }
             }
 
-            outputQueue.add(String.format("搶票完成：共搶了 %d 單", total));
-            outputQueue.add("資料填寫完成");
+            outputQueue.add(String.format("資料填寫完成，共填寫了 %d 單", post_total));
+            Logger.LOGln(String.format("資料填寫完成，共填寫了 %d 單", post_total));
         }
 
         int processRsp(JsonObject data) {
@@ -201,5 +226,24 @@ public class TicketGetter implements Runnable {
                 }
             }
         }
+    }
+
+    private static String prettyPrintHTML(String rawHTML) {
+        Tidy tidy = new Tidy();
+        tidy.setInputEncoding("UTF-8");
+        tidy.setOutputEncoding("UTF-8");
+        tidy.setXHTML(true);
+        tidy.setIndentContent(true);
+        tidy.setPrintBodyOnly(true);
+        tidy.setTidyMark(false);
+        tidy.setShowErrors(0);
+        tidy.setShowWarnings(false);
+        tidy.setQuiet(true);
+
+        Document htmlDOM = tidy.parseDOM(new ByteArrayInputStream(rawHTML.getBytes()), null);
+        OutputStream out = new ByteArrayOutputStream();
+        tidy.pprint(htmlDOM, out);
+
+        return out.toString();
     }
 }

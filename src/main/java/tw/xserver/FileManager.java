@@ -23,6 +23,7 @@ import static java.lang.System.exit;
 import static tw.xserver.GUI.ROOT_PATH;
 
 public class FileManager {
+    private static final String CHECK_HEAD = "ABCDEFGHJKLMNPQRSTUVWXYZIO"; // 字母代號對照表
     public Config config;
 
     public FileManager() {
@@ -50,8 +51,6 @@ public class FileManager {
             exit(402);
         }
     }
-
-    private static final String CHECK_HEAD = "ABCDEFGHJKLMNPQRSTUVWXYZIO"; // 字母代號對照表
 
     private static void idCheck(String inp) throws VerifyException {
         if (inp.length() != 10) {
@@ -84,7 +83,11 @@ public class FileManager {
     public void verify() throws VerifyException {
         for (Data i : config.data) {
             Set<String> ids = new HashSet<>();
-            for (Member member : i.getMembers()) {
+            if (i.getMembersAry() == null) {
+                return;
+            }
+
+            for (Member member : i.getMembersAry()) {
                 // 1. 檢查身分證號合法性
                 idCheck(member.id);
 

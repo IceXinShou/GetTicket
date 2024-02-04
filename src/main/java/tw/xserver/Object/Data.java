@@ -7,23 +7,29 @@ import java.util.Map;
 public class Data {
     public String date;
     public String[] members;
+    public Member[] membersAry;
 
+    public Member[] getMembersAry() {
+        if (membersAry != null) return membersAry;
 
-    public Member[] getMembers() {
         Member[] members_ret = new Member[members.length];
 
         for (int i = 0; i < members.length; i++) {
             String[] cur = members[i].split(" ");
+            if (cur.length != 3) return null;
+
             Integer[] birth = Arrays.stream(cur[2].split("\\.")).map(Integer::parseInt).toArray(Integer[]::new);
             members_ret[i] = new Member(cur[1], cur[0], birth[0], birth[1], birth[2]);
         }
 
-        return members_ret;
+        membersAry = members_ret;
+        return membersAry;
     }
 
     public Map<String, String> parsePostData(Guide guide) {
-        if (members.length > 20)
+        if (members.length > 20 || getMembersAry() == null) {
             return null;
+        }
 
         Map<String, String> ret = new HashMap<>();
 
@@ -43,16 +49,15 @@ public class Data {
         ret.put("BankAccount", guide.bank_account);
         ret.put("BankName", guide.bank_name);
 
-        Member[] memCache = getMembers();
         for (int i = 0; i < members.length; i++) {
-            ret.put("Name_" + i, memCache[i].name);
-            ret.put("nationality_UserId_" + i, memCache[i].nationality);
-            ret.put("UserId_" + i, memCache[i].id);
+            ret.put("Name_" + i, getMembersAry()[i].name);
+            ret.put("nationality_UserId_" + i, getMembersAry()[i].nationality);
+            ret.put("UserId_" + i, getMembersAry()[i].id);
             ret.put("Tel_" + i, guide.contact_tel);
-            ret.put("Birthday_" + i + "_Y", String.valueOf(memCache[i].birth_y));
-            ret.put("Birthday_" + i + "_M", String.valueOf(memCache[i].birth_m));
-            ret.put("Birthday_" + i + "_D", String.valueOf(memCache[i].birth_d));
-            ret.put("Food_" + i, memCache[i].food);
+            ret.put("Birthday_" + i + "_Y", String.valueOf(getMembersAry()[i].birth_y));
+            ret.put("Birthday_" + i + "_M", String.valueOf(getMembersAry()[i].birth_m));
+            ret.put("Birthday_" + i + "_D", String.valueOf(getMembersAry()[i].birth_d));
+            ret.put("Food_" + i, getMembersAry()[i].food);
             ret.put("EmergencyName_" + i, guide.contact_name);
             ret.put("EmergencyTel_" + i, guide.contact_tel);
         }
@@ -63,7 +68,10 @@ public class Data {
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder().append(date).append(": ");
-        for (Member i : getMembers()) {
+        if (getMembersAry() == null)
+            return String.valueOf(members.length);
+
+        for (Member i : getMembersAry()) {
             builder.append(i).append('\n');
         }
 

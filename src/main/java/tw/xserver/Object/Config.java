@@ -35,20 +35,24 @@ public class Config {
         for (Data i : data) {
             builder.append("\n\n日期：").append(i.date);
 
-            for (int j = 0; j < i.members.length; j++) {
-                Member member = i.getMembers()[j];
+            if (i.getMembersAry() == null) {
+                builder.append("\n成員數：").append(i.members.length);
+            } else {
+                for (int j = 0; j < i.members.length; j++) {
+                    Member member = i.getMembersAry()[j];
 
-                builder
-                        .append("\n  成員 ").append(String.format("%02d", j + 1)).append("：")
-                        .append("\n    姓名：").append(member.name)
-                        .append("\n    國籍：").append(member.nationality.equals("Taiwan") ? "本國國籍" : "非本國國籍")
-                        .append("\n    身分證字號：").append(member.id)
-                        .append("\n    聯絡電話：").append(guide.contact_tel)
-                        .append("\n    葷素食：").append(member.food)
-                        .append("\n    出生日期：").append(member.birth_y).append('/').append(member.birth_m).append('/').append(member.birth_d)
-                        .append("\n    緊急聯絡人姓名：").append(guide.contact_name)
-                        .append("\n    緊急聯絡人連絡電話：").append(guide.contact_tel)
-                        .append('\n');
+                    builder
+                            .append("\n  成員 ").append(String.format("%02d", j + 1)).append("：")
+                            .append("\n    姓名：").append(member.name)
+                            .append("\n    國籍：").append(member.nationality.equals("Taiwan") ? "本國國籍" : "非本國國籍")
+                            .append("\n    身分證字號：").append(member.id)
+                            .append("\n    聯絡電話：").append(guide.contact_tel)
+                            .append("\n    葷素食：").append(member.food)
+                            .append("\n    出生日期：").append(member.birth_y).append('/').append(member.birth_m).append('/').append(member.birth_d)
+                            .append("\n    緊急聯絡人姓名：").append(guide.contact_name)
+                            .append("\n    緊急聯絡人連絡電話：").append(guide.contact_tel)
+                            .append('\n');
+                }
             }
         }
 
