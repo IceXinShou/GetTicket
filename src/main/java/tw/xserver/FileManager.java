@@ -36,11 +36,9 @@ public class FileManager {
         }
 
 
-        try {
-            InputStream inputStream = Files.newInputStream(file.toPath());
+        try (InputStream inputStream = Files.newInputStream(file.toPath())) {
             config = new Yaml(new CustomClassLoaderConstructor(getClass().getClassLoader(), new LoaderOptions()))
                     .loadAs(inputStream, Config.class);
-            inputStream.close();
         } catch (IOException e) {
             e.printStackTrace();
             Logger.WARNln(e.getMessage());
