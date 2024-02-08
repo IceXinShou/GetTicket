@@ -23,6 +23,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static tw.xserver.GUI.forceStop;
 import static tw.xserver.GUI.sentFail_btn;
 
 public class TicketGetter implements Runnable {
@@ -111,7 +112,7 @@ public class TicketGetter implements Runnable {
                 }
             }
 
-            while (!inputQueue.isEmpty()) {
+            while (!inputQueue.isEmpty() && !forceStop.get()) {
                 Data rawData = inputQueue.peek();
                 String formattedURL = String.format("https://travel.wutai.gov.tw/Signup/CreateOrder/HYCDEMO%s02/%d",
                         rawData.date.replace("/", ""), rawData.member_count

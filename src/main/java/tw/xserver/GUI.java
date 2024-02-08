@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.lang.System.exit;
@@ -23,6 +24,7 @@ public class GUI {
     public static final String ROOT_PATH = new File(System.getProperty("user.dir")).toString() + '/';
     private static FileManager manager;
     private static ExecutorService executor;
+    public static AtomicBoolean forceStop = new AtomicBoolean(false);
 
     public static void main(String[] args) {
         frame = new JFrame("搶票大師 (Discord: xs._.b)");
@@ -51,6 +53,11 @@ public class GUI {
         start_btn = new JButton("開始執行");
         start_btn.setBounds(15, 75, 100, 25);
         panel.add(start_btn);
+
+        forceStop_btn = new JButton("強制結束");
+        forceStop_btn.setBounds(15, 105, 100, 25);
+        forceStop_btn.setEnabled(false);
+        panel.add(forceStop_btn);
 
         sentFail_btn = new JButton("檢視錯誤");
         sentFail_btn.setBounds(15, 135, 100, 25);
@@ -93,6 +100,8 @@ public class GUI {
                 executor.shutdownNow();
             }
 
+            forceStop.set(false);
+            forceStop_btn.setEnabled(true);
             if (outputArea.getText().isEmpty()) {
                 outputArea.setText("開始搶票，結束前請勿再次按下按鈕！\n");
             } else {
@@ -104,6 +113,8 @@ public class GUI {
         });
 
         sentFail_btn.addActionListener(event -> {
+            sentFail_btn.setEnabled(false);
+
             if (!Desktop.isDesktopSupported()) {
                 Logger.WARNln("不支援的瀏覽器！");
                 outputArea.setText(outputArea.getText() + "\n您的瀏覽器不支援顯示");
@@ -129,7 +140,11 @@ public class GUI {
             }
 
             file.deleteOnExit();
-            sentFail_btn.setEnabled(false);
+        });
+
+        forceStop_btn.addActionListener(event -> {
+            forceStop.set(true);
+            forceStop_btn.setEnabled(false);
         });
     }
 
@@ -158,4 +173,5 @@ public class GUI {
     private static JButton preview_btn;
     private static JButton start_btn;
     public static JButton sentFail_btn;
+    public static JButton forceStop_btn;
 }
