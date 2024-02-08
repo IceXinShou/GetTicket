@@ -23,9 +23,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static tw.xserver.GUI.sentFail_btn;
+
 public class TicketGetter implements Runnable {
     private static ConcurrentLinkedQueue<Data> inputQueue;
     private static ConcurrentLinkedQueue<String> outputQueue;
+    public static ConcurrentLinkedQueue<String> sentFailedQueue;
     private static ConcurrentLinkedQueue<Connection> sendReq;
     private static ExecutorService connector;
     private static ExecutorService areaUpdater;
@@ -33,39 +36,38 @@ public class TicketGetter implements Runnable {
     private static int counter;
     private static int get_total;
     private static int post_total;
-    private static JTextArea area;
     private static Config config;
 
 
-    public TicketGetter(Config config, JTextArea area) {
+    public TicketGetter(Config config) {
         countDown = new CountDownLatch(1);
         inputQueue = new ConcurrentLinkedQueue<>();
         outputQueue = new ConcurrentLinkedQueue<>();
+        sentFailedQueue = new ConcurrentLinkedQueue<>();
         sendReq = new ConcurrentLinkedQueue<>();
         areaUpdater = Executors.newSingleThreadExecutor();
         connector = Executors.newSingleThreadExecutor();
         TicketGetter.config = config;
-        TicketGetter.area = area;
         counter = 1;
         get_total = 0;
         post_total = 0;
 
         for (Data i : config.data) {
             for (int j = 0; j < i.member_count; j += 20) {
-                Data d = new Data();
-                d.date = i.date;
-                d.member_count = Math.min(20, i.member_count - j);
+                Data newD = new Data();
+                newD.date = i.date;
+                newD.member_count = Math.min(20, i.member_count - j);
                 if (i.members != null)
-                    d.members = Arrays.copyOfRange(i.members, j, Math.min(20, i.member_count - j));
+                    newD.members = Arrays.copyOfRange(i.members, j, Math.min(20, i.member_count - j));
 
-                inputQueue.add(d);
+                inputQueue.add(newD);
             }
         }
     }
 
     @Override
     public void run() {
-        areaUpdater.submit(new AreaUpdater(area));
+        areaUpdater.submit(new AreaUpdater());
         connector.submit(new Connector());
 
         try {
@@ -79,14 +81,9 @@ public class TicketGetter implements Runnable {
     }
 
     static class AreaUpdater implements Runnable {
-        private final JTextArea area;
-
-        AreaUpdater(JTextArea area) {
-            this.area = area;
-        }
-
         @Override
         public void run() {
+            JTextArea area = GUI.outputArea;
             while (true)
                 if (!outputQueue.isEmpty()) {
                     String data = outputQueue.poll();
@@ -179,13 +176,18 @@ public class TicketGetter implements Runnable {
                 }
             }
 
+            Logger.LOGln("----------------------------------------");
             Logger.LOGln(String.format("搶票完成，共搶了 %d 單", get_total));
-            outputQueue.add(String.format("搶票完成，共搶了 %d 單", get_total));
             Logger.LOGln("正在填寫資料...");
+
+            outputQueue.add("----------------------------------------");
+            outputQueue.add(String.format("搶票完成，共搶了 %d 單", get_total));
             outputQueue.add("正在填寫資料...");
 
             while (!sendReq.isEmpty()) {
                 Logger.LOGln("----------------------------------------");
+                outputQueue.add("----------------------------------------");
+
                 try {
                     Connection.Response rsp = sendReq.poll().execute();
 
@@ -197,6 +199,9 @@ public class TicketGetter implements Runnable {
                         outputQueue.add("失敗: " + rsp.url().toString());
                         Logger.WARNln("失敗: " + rsp.url().toString());
                         Logger.WARNln(prettyPrintHTML(rsp.body()).replace("\n", ""));
+
+                        sentFailedQueue.add(prettyPrintHTML(rsp.body()).replace("\n", ""));
+                        sentFail_btn.setEnabled(true);
                     }
 
                     Thread.sleep(100);
@@ -204,9 +209,11 @@ public class TicketGetter implements Runnable {
                     throw new RuntimeException(e);
                 }
             }
-
-            outputQueue.add(String.format("資料填寫完成，共填寫了 %d 單", post_total));
+            Logger.LOGln("----------------------------------------");
             Logger.LOGln(String.format("資料填寫完成，共填寫了 %d 單", post_total));
+
+            outputQueue.add("----------------------------------------");
+            outputQueue.add(String.format("資料填寫完成，共填寫了 %d 單", post_total));
         }
 
         int processRsp(JsonObject data) {

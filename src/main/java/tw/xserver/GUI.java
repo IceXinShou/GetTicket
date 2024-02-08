@@ -1,16 +1,22 @@
 package tw.xserver;
 
 import tw.xserver.utils.VerifyException;
+import tw.xserver.utils.logger.Logger;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import static java.lang.System.exit;
+import static tw.xserver.TicketGetter.sentFailedQueue;
 
 
 public class GUI {
@@ -45,6 +51,11 @@ public class GUI {
         start_btn = new JButton("開始執行");
         start_btn.setBounds(15, 75, 100, 25);
         panel.add(start_btn);
+
+        sentFail_btn = new JButton("檢視錯誤");
+        sentFail_btn.setBounds(15, 135, 100, 25);
+        sentFail_btn.setEnabled(false);
+        panel.add(sentFail_btn);
 
         outputArea = new JTextArea();
         outputArea.setEditable(false);
@@ -89,7 +100,36 @@ public class GUI {
             }
 
             executor = Executors.newSingleThreadExecutor();
-            executor.submit(new TicketGetter(manager.config, outputArea));
+            executor.submit(new TicketGetter(manager.config));
+        });
+
+        sentFail_btn.addActionListener(event -> {
+            if (!Desktop.isDesktopSupported()) {
+                Logger.WARNln("不支援的瀏覽器！");
+                outputArea.setText(outputArea.getText() + "\n您的瀏覽器不支援顯示");
+                return;
+            }
+
+            Path tempFile;
+            try {
+                tempFile = Files.createTempFile("tempHtml", ".html");
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            File file = tempFile.toFile();
+
+            while (!sentFailedQueue.isEmpty()) {
+                // 将 HTML 写入临时文件
+                try (FileWriter writer = new FileWriter(file)) {
+                    writer.write(sentFailedQueue.poll());
+                    Desktop.getDesktop().browse(file.toURI());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            file.deleteOnExit();
+            sentFail_btn.setEnabled(false);
         });
     }
 
@@ -110,11 +150,12 @@ public class GUI {
     }
 
     // ------- GUI Component -------
-    private static JTextArea outputArea;
+    public static JTextArea outputArea;
     private static JScrollPane outputScrollPane;
     private static JFrame frame;
     private static JPanel panel;
     private static JButton read_btn;
     private static JButton preview_btn;
     private static JButton start_btn;
+    public static JButton sentFail_btn;
 }
