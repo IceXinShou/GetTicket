@@ -18,7 +18,7 @@ public class Config {
     @Override
     public String toString() {
         int total_member = 0;
-        int total_days = data.size() + custom_data.length;
+        int total_days = data.size() + ((custom_data == null) ? 0 : custom_data.length);
         int total_split_count = 0;
 
         StringBuilder builder = new StringBuilder();
@@ -41,14 +41,16 @@ public class Config {
                 .append("\n  銀行戶名: ").append(guide.bank_name);
 
         builder.append("\n");
-        for (Data i : custom_data) {
-            builder.append("\n\n日期: ").append(i.date);
-            total_member += i.custom_count;
-            total_split_count += (i.custom_count / 20) + ((i.custom_count % 20 == 0) ? 0 : 1);
-            builder
-                    .append(" [僅取得報名連結]")
-                    .append("\n成員數: ").append(i.custom_count).append('\n');
-        }
+
+        if (custom_data != null)
+            for (Data i : custom_data) {
+                builder.append("\n\n日期: ").append(i.date);
+                total_member += i.custom_count;
+                total_split_count += (i.custom_count / 20) + ((i.custom_count % 20 == 0) ? 0 : 1);
+                builder
+                        .append(" [僅取得報名連結]")
+                        .append("\n成員數: ").append(i.custom_count).append('\n');
+            }
 
         for (Data i : data) {
             int member_count = i.getMembers().size();

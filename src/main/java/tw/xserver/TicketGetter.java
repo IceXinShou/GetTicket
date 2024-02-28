@@ -59,17 +59,18 @@ public class TicketGetter implements Runnable {
         post_success = 0;
         post_fail = 0;
 
-        for (Data i : config.custom_data) {
-            int member_count = i.custom_count;
-            LOGGER.debug("date: {}, member: {}", i.date, member_count);
+        if (config.custom_data != null)
+            for (Data i : config.custom_data) {
+                int member_count = i.custom_count;
+                LOGGER.debug("date: {}, member: {}", i.date, member_count);
 
-            for (int j = 0; j < member_count; j += 20) {
-                int newSize = Math.min(20, member_count - j);
-                Data newD = new Data().init(i.date, newSize);
-                LOGGER.debug("size: {}", newSize);
-                inputQueue.add(newD);
+                for (int j = 0; j < member_count; j += 20) {
+                    int newSize = Math.min(20, member_count - j);
+                    Data newD = new Data().init(i.date, newSize);
+                    LOGGER.debug("size: {}", newSize);
+                    inputQueue.add(newD);
+                }
             }
-        }
 
         for (Data i : config.data) {
             int member_count = i.getMembers().size();
@@ -163,8 +164,10 @@ public class TicketGetter implements Runnable {
         public void run() {
             if (inputQueue.isEmpty()) {
                 LOGGER.error("input queue empty");
-                countDown.countDown();
                 LOGGER.info("Connector shutdown");
+
+                outputQueue.add("完成");
+                countDown.countDown();
                 return;
             }
 
@@ -306,8 +309,9 @@ public class TicketGetter implements Runnable {
             outputQueue.add(String.format("提交 %d 單", post_success));
             outputQueue.add(String.format("失敗 %d 單", post_fail));
 
-            countDown.countDown();
             LOGGER.info("Connector shutdown");
+            outputQueue.add("完成");
+            countDown.countDown();
         }
 
         ResponseType processRsp(JsonObject data) {
