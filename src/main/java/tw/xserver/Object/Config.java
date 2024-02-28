@@ -18,7 +18,7 @@ public class Config {
     @Override
     public String toString() {
         int total_member = 0;
-        int total_days = data.size();
+        int total_days = data.size() + custom_data.length;
         int total_split_count = 0;
 
         StringBuilder builder = new StringBuilder();
@@ -41,6 +41,15 @@ public class Config {
                 .append("\n  銀行戶名: ").append(guide.bank_name);
 
         builder.append("\n");
+        for (Data i : custom_data) {
+            builder.append("\n\n日期: ").append(i.date);
+            total_member += i.custom_count;
+            total_split_count += (i.custom_count / 20) + ((i.custom_count % 20 == 0) ? 0 : 1);
+            builder
+                    .append(" [僅取得報名連結]")
+                    .append("\n成員數: ").append(i.custom_count).append('\n');
+        }
+
         for (Data i : data) {
             int member_count = i.getMembers().size();
 
@@ -48,27 +57,21 @@ public class Config {
             total_member += member_count;
             total_split_count += (member_count / 20) + ((member_count % 20 == 0) ? 0 : 1);
             try {
-                if (i.getMembers() == null) {
-                    builder
-                            .append(" [僅取得報名連結]")
-                            .append("\n成員數: ").append(member_count).append('\n');
-                } else {
-                    builder.append(" [自動填寫報名表]");
-                    for (int j = 0; j < i.getMembers().size(); j++) {
-                        Member member = i.getMembers().get(j);
+                builder.append(" [自動填寫報名表]");
+                for (int j = 0; j < i.getMembers().size(); j++) {
+                    Member member = i.getMembers().get(j);
 
-                        builder
-                                .append("\n  成員 ").append(String.format("%02d", j + 1)).append(": ")
-                                .append("\n    姓名: ").append(member.name)
-                                .append("\n    國籍: ").append(member.nationality.equals("Taiwan") ? "本國國籍" : "非本國國籍")
-                                .append("\n    身分證字號: ").append(member.id)
-                                .append("\n    聯絡電話: ").append(guide.contact_tel)
-                                .append("\n    葷素食: ").append(member.food)
-                                .append("\n    出生日期: ").append(member.birth_y).append('/').append(member.birth_m).append('/').append(member.birth_d)
-                                .append("\n    緊急聯絡人姓名: ").append(guide.contact_name)
-                                .append("\n    緊急聯絡人連絡電話: ").append(guide.contact_tel)
-                                .append('\n');
-                    }
+                    builder
+                            .append("\n  成員 ").append(String.format("%02d", j + 1)).append(": ")
+                            .append("\n    姓名: ").append(member.name)
+                            .append("\n    國籍: ").append(member.nationality.equals("Taiwan") ? "本國國籍" : "非本國國籍")
+                            .append("\n    身分證字號: ").append(member.id)
+                            .append("\n    聯絡電話: ").append(guide.contact_tel)
+                            .append("\n    葷素食: ").append(member.food)
+                            .append("\n    出生日期: ").append(member.birth_y).append('/').append(member.birth_m).append('/').append(member.birth_d)
+                            .append("\n    緊急聯絡人姓名: ").append(guide.contact_name)
+                            .append("\n    緊急聯絡人連絡電話: ").append(guide.contact_tel)
+                            .append('\n');
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);

@@ -19,6 +19,7 @@ import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.*;
 
@@ -36,6 +37,7 @@ public class TicketGetter implements Runnable {
     private static ScheduledExecutorService awaitSender;
     private static CountDownLatch countDown;
     private static int get_total;
+    private static int post_await;
     private static int post_success;
     private static int post_fail;
     private static Config config;
@@ -53,8 +55,21 @@ public class TicketGetter implements Runnable {
         connector = Executors.newSingleThreadExecutor();
         awaitSender = Executors.newScheduledThreadPool(100);
         get_total = 0;
+        post_await = 0;
         post_success = 0;
         post_fail = 0;
+
+        for (Data i : config.custom_data) {
+            int member_count = i.custom_count;
+            LOGGER.debug("date: {}, member: {}", i.date, member_count);
+
+            for (int j = 0; j < member_count; j += 20) {
+                int newSize = Math.min(20, member_count - j);
+                Data newD = new Data().init(i.date, newSize);
+                LOGGER.debug("size: {}", newSize);
+                inputQueue.add(newD);
+            }
+        }
 
         for (Data i : config.data) {
             int member_count = i.getMembers().size();
@@ -149,6 +164,7 @@ public class TicketGetter implements Runnable {
             if (inputQueue.isEmpty()) {
                 LOGGER.error("input queue empty");
                 countDown.countDown();
+                LOGGER.info("Connector shutdown");
                 return;
             }
 
@@ -182,7 +198,8 @@ public class TicketGetter implements Runnable {
             while (!forceStop.get() && !inputQueue.isEmpty()) {
                 Data rawData = inputQueue.peek();
                 String formattedURL = String.format("https://travel.wutai.gov.tw/Signup/CreateOrder/HYCDEMO%s02/%d",
-                        rawData.date.replace("/", ""), rawData.getMembers().size()
+                        rawData.date.replace("/", ""),
+                        Objects.requireNonNullElseGet(rawData.custom_count, () -> rawData.getMembers().size())
                 );
 
                 LOGGER.info("----------------------------------------");
@@ -205,7 +222,18 @@ public class TicketGetter implements Runnable {
                             LOGGER.info("OK 成功: {} {}", rawData.date, rawData.getMembers().size());
                             LOGGER.info("表單連結: {}", url);
 
+                            outputQueue.add(String.format("%02d: (%s) [%02d] %s",
+                                    ++get_total,
+                                    rawData.date.substring(5, 10),
+                                    Objects.requireNonNullElseGet(rawData.custom_count, () -> rawData.getMembers().size()),
+                                    url
+                            ));
+                            inputQueue.poll();
+
+                            if (rawData.custom_count != null) break;
+
                             if (rawData.parsePostData(config.guide) != null) {
+                                ++post_await;
                                 sendReq.add(Jsoup.connect(url)
                                         .method(Connection.Method.POST)
                                         .referrer(url)
@@ -215,16 +243,11 @@ public class TicketGetter implements Runnable {
                                         .data("Verify", rspJson.get("verify").getAsString()));
                             }
 
-                            outputQueue.add(String.format("%02d: (%s) [%02d] %s",
-                                    ++get_total,
-                                    rawData.date.substring(5, 10),
-                                    rawData.getMembers().size(),
-                                    url
-                            ));
-
-                            inputQueue.poll();
                             break;
                         }
+
+                        case FAILURE:
+                            break;
 
                         case FALSE: {
                             inputQueue.add(inputQueue.poll());
@@ -235,6 +258,11 @@ public class TicketGetter implements Runnable {
                             LOGGER.warn("沒票了!! : {} {}", rawData.date.substring(5, 10), rawData.getMembers().size());
                             outputQueue.add(String.format("-> -> -> NO QUOTA 沒票了: %s %d", rawData.date.substring(5, 10), rawData.getMembers().size()));
                             inputQueue.poll();
+                            break;
+                        }
+
+                        case UNKNOWN: {
+                            LOGGER.error("unknown response");
                             break;
                         }
                     }
@@ -260,7 +288,7 @@ public class TicketGetter implements Runnable {
                 awaitSend(sendReq.poll(), awaitTime); // 12 ~ 18 min
             }
 
-            while ((post_success + post_fail) != get_total) {
+            while ((post_success + post_fail) != post_await) {
                 try {
                     TimeUnit.SECONDS.sleep(1);
                 } catch (InterruptedException e) {
@@ -277,6 +305,9 @@ public class TicketGetter implements Runnable {
             outputQueue.add("資料填寫完成");
             outputQueue.add(String.format("提交 %d 單", post_success));
             outputQueue.add(String.format("失敗 %d 單", post_fail));
+
+            countDown.countDown();
+            LOGGER.info("Connector shutdown");
         }
 
         ResponseType processRsp(JsonObject data) {

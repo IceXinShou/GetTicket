@@ -16,6 +16,12 @@ public class Data {
     public Integer custom_count;
     private List<Member> members = new ArrayList<>();
 
+    public Data init(String date, int customCount) {
+        this.date = date;
+        this.custom_count = customCount;
+        return this;
+    }
+
     public Data init(String date, List<Member> members) {
         this.date = date;
         this.members = members;
