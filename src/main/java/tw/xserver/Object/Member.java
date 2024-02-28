@@ -1,5 +1,7 @@
 package tw.xserver.Object;
 
+import java.util.Arrays;
+
 public class Member {
     public String name;
     public String nationality;
@@ -18,6 +20,17 @@ public class Member {
 
         this.nationality = "Taiwan";
         this.food = "葷食";
+    }
+
+    public Member(String name, String id, String birthday) {
+        this(name, id, 0, 0, 0);
+
+        Integer[] birth = Arrays.stream(birthday.split("\\."))
+                .map(Integer::parseInt)
+                .toArray(Integer[]::new);
+        this.birth_y = birth[0];
+        this.birth_m = birth[1];
+        this.birth_d = birth[2];
     }
 
     @Override

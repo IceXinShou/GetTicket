@@ -4,11 +4,12 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.tidy.Tidy;
 import tw.xserver.Object.Config;
 import tw.xserver.Object.Data;
-import tw.xserver.utils.logger.Logger;
 
 import javax.swing.*;
 import java.io.ByteArrayInputStream;
@@ -18,29 +19,31 @@ import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.Random;
+import java.util.concurrent.*;
 
 import static tw.xserver.GUI.forceStop;
 import static tw.xserver.GUI.sentFail_btn;
 
 public class TicketGetter implements Runnable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TicketGetter.class);
+    private static final Random random = new Random();
     private static ConcurrentLinkedQueue<Data> inputQueue;
     private static ConcurrentLinkedQueue<String> outputQueue;
-    public static ConcurrentLinkedQueue<String> sentFailedQueue;
     private static ConcurrentLinkedQueue<Connection> sendReq;
     private static ExecutorService connector;
     private static ExecutorService areaUpdater;
+    private static ScheduledExecutorService awaitSender;
     private static CountDownLatch countDown;
-    private static int counter;
     private static int get_total;
-    private static int post_total;
+    private static int post_success;
+    private static int post_fail;
     private static Config config;
+    public static ConcurrentLinkedQueue<String> sentFailedQueue;
 
 
     public TicketGetter(Config config) {
+        TicketGetter.config = config;
         countDown = new CountDownLatch(1);
         inputQueue = new ConcurrentLinkedQueue<>();
         outputQueue = new ConcurrentLinkedQueue<>();
@@ -48,19 +51,21 @@ public class TicketGetter implements Runnable {
         sendReq = new ConcurrentLinkedQueue<>();
         areaUpdater = Executors.newSingleThreadExecutor();
         connector = Executors.newSingleThreadExecutor();
-        TicketGetter.config = config;
-        counter = 1;
+        awaitSender = Executors.newScheduledThreadPool(100);
         get_total = 0;
-        post_total = 0;
+        post_success = 0;
+        post_fail = 0;
 
         for (Data i : config.data) {
-            for (int j = 0; j < i.member_count; j += 20) {
-                Data newD = new Data();
-                newD.date = i.date;
-                newD.member_count = Math.min(20, i.member_count - j);
-                if (i.members != null)
-                    newD.members = Arrays.copyOfRange(i.members, j, Math.min(20, i.member_count - j));
+            int member_count = i.getMembers().size();
+            LOGGER.debug("date: {}, member: {}", i.date, member_count);
 
+            for (int j = 0; j < member_count; j += 20) {
+                int newSizeEnd = j + Math.min(20, member_count - j);
+                Data newD = new Data().init(i.date, i.getMembers().subList(j, newSizeEnd));
+                LOGGER.debug("range ({}, {}), size: {}, ctx: {}",
+                        j, newSizeEnd,
+                        newD.getMembers().size(), Arrays.toString(newD.getMembers().toArray()));
                 inputQueue.add(newD);
             }
         }
@@ -76,16 +81,44 @@ public class TicketGetter implements Runnable {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
-            connector.shutdownNow();
-            areaUpdater.shutdownNow();
+            connector.shutdown();
+            areaUpdater.shutdown();
         }
+    }
+
+    private static void awaitSend(Connection connection, int delayInSeconds) {
+        awaitSender.schedule(() -> {
+            try {
+                Connection.Response rsp = connection.execute();
+
+                LOGGER.info("----------------------------------------");
+                outputQueue.add("----------------------------------------");
+
+                if (rsp.url().toString().contains("OrderComplete")) {
+                    outputQueue.add(rsp.url().toString());
+                    LOGGER.info(rsp.url().toString());
+                    ++post_success;
+                } else {
+                    outputQueue.add("失敗: " + rsp.url().toString());
+                    LOGGER.warn("失敗: {}", rsp.url().toString());
+                    LOGGER.warn(prettyPrintHTML(rsp.body()).replace("\n", ""));
+
+                    ++post_fail;
+                    sentFailedQueue.add(prettyPrintHTML(rsp.body()).replace("\n", ""));
+                    sentFail_btn.setEnabled(true);
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+        }, delayInSeconds, TimeUnit.SECONDS);
     }
 
     static class AreaUpdater implements Runnable {
         @Override
         public void run() {
             JTextArea area = GUI.outputArea;
-            while (true)
+            while (countDown.getCount() > 0)
                 if (!outputQueue.isEmpty()) {
                     String data = outputQueue.poll();
                     if (area.getText().isEmpty()) {
@@ -94,47 +127,83 @@ public class TicketGetter implements Runnable {
                         area.setText(area.getText() + "\n" + data);
                     }
                 }
+            LOGGER.info("AreaUpdater shutdown");
         }
+    }
+
+    /**
+     * @param date: ex-format "2024-04-01"
+     * @return is ticket available
+     */
+    private static boolean checkTicketAvailable(String date) throws IOException {
+        Connection.Response rsp = Jsoup
+                .connect("https://travel.wutai.gov.tw/Travel/QuotaByDate/HYCDEMO/" + date)
+                .referrer("https://travel.wutai.gov.tw/")
+                .execute();
+        return !JsonParser.parseString(rsp.body()).getAsJsonArray().isEmpty();
     }
 
     static class Connector implements Runnable {
         @Override
         public void run() {
-            while (true) {
+            if (inputQueue.isEmpty()) {
+                LOGGER.error("input queue empty");
+                countDown.countDown();
+                return;
+            }
+
+            while (countDown.getCount() > 0) {
                 if (LocalDateTime.now().isAfter(config.getDateTime())) {
-                    Logger.LOGln("RUN");
+                    LOGGER.info("已過預計時間，開始驗證票");
                     break;
                 }
                 try {
-                    Thread.sleep(300);
+                    Thread.sleep(100);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
             }
 
-            while (!inputQueue.isEmpty() && !forceStop.get()) {
+            try {
+                while (countDown.getCount() > 0) {
+                    assert inputQueue.peek() != null;
+                    if (checkTicketAvailable(inputQueue.peek().date.replace('/', '-'))) {
+                        LOGGER.info("取得票資訊，開始搶票");
+                        break;
+                    } else {
+                        LOGGER.debug("check empty");
+                    }
+                    Thread.sleep(300);
+                }
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+            while (!forceStop.get() && !inputQueue.isEmpty()) {
                 Data rawData = inputQueue.peek();
                 String formattedURL = String.format("https://travel.wutai.gov.tw/Signup/CreateOrder/HYCDEMO%s02/%d",
-                        rawData.date.replace("/", ""), rawData.member_count
+                        rawData.date.replace("/", ""), rawData.getMembers().size()
                 );
 
-
-                Logger.LOGln("----------------------------------------");
-                Logger.LOGln("REQ: " + formattedURL);
+                LOGGER.info("----------------------------------------");
+                LOGGER.info("REQ: {}", formattedURL);
 
                 try {
-                    Connection.Response rsp = Jsoup.connect(formattedURL).execute();
+                    Connection.Response rsp = Jsoup
+                            .connect(formattedURL)
+                            .referrer("https://travel.wutai.gov.tw/Travel/Detail/HYCDEMO/" + rawData.date.replace("/", ""))
+                            .execute();
                     Map<String, String> cookies = rsp.cookies();
                     JsonObject rspJson = JsonParser.parseString(rsp.body()).getAsJsonObject();
-                    Logger.LOGln(rspJson.toString());
 
+                    LOGGER.info(rspJson.toString());
                     switch (processRsp(rspJson)) {
-                        case 0: {
+                        case OK: {
                             int oid = rspJson.get("oid").getAsInt();
                             String verify = rspJson.get("verify").getAsString();
                             String url = String.format("https://travel.wutai.gov.tw/Signup/Users/%d/%s", oid, verify);
-                            Logger.LOGln("OK 成功: " + rawData.date + ' ' + rawData.member_count);
-                            Logger.LOGln("表單連結: " + url);
+                            LOGGER.info("OK 成功: {} {}", rawData.date, rawData.getMembers().size());
+                            LOGGER.info("表單連結: {}", url);
 
                             if (rawData.parsePostData(config.guide) != null) {
                                 sendReq.add(Jsoup.connect(url)
@@ -147,96 +216,77 @@ public class TicketGetter implements Runnable {
                             }
 
                             outputQueue.add(String.format("%02d: (%s) [%02d] %s",
-                                    counter++,
+                                    ++get_total,
                                     rawData.date.substring(5, 10),
-                                    rawData.member_count,
+                                    rawData.getMembers().size(),
                                     url
                             ));
 
                             inputQueue.poll();
-                            ++get_total;
                             break;
                         }
 
-                        case 2: {
-                            Logger.WARNln("FAIL 失敗: " + rawData.date.substring(5, 10) + ' ' + rawData.member_count);
-                            outputQueue.add(String.format(" FAIL 失敗: %s %d", rawData.date.substring(5, 10), rawData.member_count));
+                        case FALSE: {
                             inputQueue.add(inputQueue.poll());
                             break;
                         }
 
-                        case 1: {
-//                            inputQueue.add(inputQueue.poll());
+                        case NO_QUOTA: {
+                            LOGGER.warn("沒票了!! : {} {}", rawData.date.substring(5, 10), rawData.getMembers().size());
+                            outputQueue.add(String.format("-> -> -> NO QUOTA 沒票了: %s %d", rawData.date.substring(5, 10), rawData.getMembers().size()));
+                            inputQueue.poll();
                             break;
                         }
                     }
 
                     Thread.sleep(config.send_delay);
-                } catch (InterruptedException | IOException e) {
+                } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
             }
 
-            Logger.LOGln("----------------------------------------");
-            Logger.LOGln(String.format("搶票完成，共搶了 %d 單", get_total));
-            Logger.LOGln("正在填寫資料...");
+            LOGGER.info("----------------------------------------");
+            LOGGER.info("搶票完成，共搶了 {} 單", get_total);
+            LOGGER.info("正在填寫資料...");
+
 
             outputQueue.add("----------------------------------------");
             outputQueue.add(String.format("搶票完成，共搶了 %d 單", get_total));
             outputQueue.add("正在填寫資料...");
 
             while (!sendReq.isEmpty()) {
-                Logger.LOGln("----------------------------------------");
-                outputQueue.add("----------------------------------------");
+                int awaitTime = random.nextInt(420) + 720;
+                LOGGER.info("自動排程等待時間: {} 秒", awaitTime);
+                awaitSend(sendReq.poll(), awaitTime); // 12 ~ 18 min
+            }
 
+            while ((post_success + post_fail) != get_total) {
                 try {
-                    Connection.Response rsp = sendReq.poll().execute();
-
-                    if (rsp.url().toString().contains("OrderComplete")) {
-                        outputQueue.add(rsp.url().toString());
-                        Logger.LOGln(rsp.url().toString());
-                        ++post_total;
-                    } else {
-                        outputQueue.add("失敗: " + rsp.url().toString());
-                        Logger.WARNln("失敗: " + rsp.url().toString());
-                        Logger.WARNln(prettyPrintHTML(rsp.body()).replace("\n", ""));
-
-                        sentFailedQueue.add(prettyPrintHTML(rsp.body()).replace("\n", ""));
-                        sentFail_btn.setEnabled(true);
-                    }
-
-                    Thread.sleep(100);
-                } catch (IOException | InterruptedException e) {
+                    TimeUnit.SECONDS.sleep(1);
+                } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
             }
-            Logger.LOGln("----------------------------------------");
-            Logger.LOGln(String.format("資料填寫完成，共填寫了 %d 單", post_total));
+
+            LOGGER.info("----------------------------------------");
+            LOGGER.info("資料填寫完成");
+            LOGGER.info("提交 {} 單", post_success);
+            LOGGER.info("失敗 {} 單", post_fail);
 
             outputQueue.add("----------------------------------------");
-            outputQueue.add(String.format("資料填寫完成，共填寫了 %d 單", post_total));
+            outputQueue.add("資料填寫完成");
+            outputQueue.add(String.format("提交 %d 單", post_success));
+            outputQueue.add(String.format("失敗 %d 單", post_fail));
         }
 
-        int processRsp(JsonObject data) {
-            switch (data.get("Status").getAsString()) {
-                case "OK": {
-                    return 0;
-                }
-
-                case "false": {
-                    // ticket not available
-                    return 1;
-                }
-
-                case "noQuota": {
-                    // no more ticket
-                    return 2;
-                }
-
-                default: {
-                    return -1;
-                }
-            }
+        ResponseType processRsp(JsonObject data) {
+            return switch (data.get("Status").getAsString()) {
+                case "OK" -> ResponseType.OK;
+                case "false" -> ResponseType.FALSE;
+                case "noQuota" -> ResponseType.NO_QUOTA;
+                case "failure" -> ResponseType.FAILURE;
+                default -> ResponseType.UNKNOWN;
+            };
         }
     }
 
@@ -257,5 +307,13 @@ public class TicketGetter implements Runnable {
         tidy.pprint(htmlDOM, out);
 
         return out.toString();
+    }
+
+    private enum ResponseType {
+        OK, // success
+        NO_QUOTA, // no more ticket
+        FAILURE, // official limit
+        FALSE, // unknown error
+        UNKNOWN,
     }
 }

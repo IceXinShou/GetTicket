@@ -1,7 +1,8 @@
 package tw.xserver;
 
-import tw.xserver.utils.VerifyException;
-import tw.xserver.utils.logger.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import tw.xserver.Exceptions.BadUserIdFormat;
 
 import javax.swing.*;
 import java.awt.*;
@@ -21,6 +22,7 @@ import static tw.xserver.TicketGetter.sentFailedQueue;
 
 
 public class GUI {
+    private static final Logger LOGGER = LoggerFactory.getLogger(GUI.class);
     public static final String ROOT_PATH = new File(System.getProperty("user.dir")).toString() + '/';
     private static FileManager manager;
     private static ExecutorService executor;
@@ -103,9 +105,9 @@ public class GUI {
             forceStop.set(false);
             forceStop_btn.setEnabled(true);
             if (outputArea.getText().isEmpty()) {
-                outputArea.setText("開始搶票，結束前請勿再次按下按鈕！\n");
+                outputArea.setText("開始執行，結束前請勿再次按下按鈕！\n");
             } else {
-                outputArea.setText(outputArea.getText() + "\n\n開始搶票，結束前請勿再次按下按鈕！\n");
+                outputArea.setText(outputArea.getText() + "\n\n開始執行，結束前請勿再次按下按鈕！\n");
             }
 
             executor = Executors.newSingleThreadExecutor();
@@ -116,7 +118,7 @@ public class GUI {
             sentFail_btn.setEnabled(false);
 
             if (!Desktop.isDesktopSupported()) {
-                Logger.WARNln("不支援的瀏覽器！");
+                LOGGER.warn("不支援的瀏覽器！");
                 outputArea.setText(outputArea.getText() + "\n您的瀏覽器不支援顯示");
                 return;
             }
@@ -149,10 +151,10 @@ public class GUI {
     }
 
     private static void managerInit() {
-        manager = new FileManager();
         try {
+            manager = new FileManager();
             manager.verify();
-        } catch (VerifyException e) {
+        } catch (BadUserIdFormat e) {
             JOptionPane.showMessageDialog(null,
                     e.getClass().getName() + ": " + e.getMessage() + '\n' +
                             "\tat " + Arrays.stream(e.getStackTrace())
@@ -161,6 +163,8 @@ public class GUI {
                             .collect(Collectors.joining("\n\tat "))
             );
             exit(400);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
