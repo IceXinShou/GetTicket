@@ -23,8 +23,7 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.*;
 
-import static tw.xserver.GUI.forceStop;
-import static tw.xserver.GUI.sentFail_btn;
+import static tw.xserver.GUI.*;
 
 public class TicketGetter implements Runnable {
     private static final Logger LOGGER = LoggerFactory.getLogger(TicketGetter.class);
@@ -167,6 +166,7 @@ public class TicketGetter implements Runnable {
                 LOGGER.info("Connector shutdown");
 
                 outputQueue.add("完成");
+                forceStop_btn.setEnabled(false);
                 countDown.countDown();
                 return;
             }
@@ -311,6 +311,7 @@ public class TicketGetter implements Runnable {
 
             LOGGER.info("Connector shutdown");
             outputQueue.add("完成");
+            forceStop_btn.setEnabled(false);
             countDown.countDown();
         }
 
