@@ -10,8 +10,8 @@ import tw.xserver.Exceptions.BadSheetNameFormat;
 import tw.xserver.Exceptions.BadUserBirthFormat;
 import tw.xserver.Exceptions.BadUserIdFormat;
 import tw.xserver.Object.Config;
-import tw.xserver.Object.Data;
 import tw.xserver.Object.Member;
+import tw.xserver.Object.Roll;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -148,11 +148,11 @@ public class XlsxManager {
             String date = String.format("2024/%s/%s", i.getKey().substring(0, 2), i.getKey().substring(2, 4));
 
             List<Member> members = i.getValue();
-            config.data.add(new Data().init(date, members));
+            config.roll.add(new Roll().init(config.guide, date, members));
             LOGGER.info("loaded member data: {}", date);
         }
 
-        config.data.sort(Comparator.comparing(Data::getDate));
+        config.roll.sort(Comparator.comparing(Roll::getDate));
     }
 
     private static final Pattern DATE_PATTERN = Pattern.compile("^(" +

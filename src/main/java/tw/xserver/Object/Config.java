@@ -8,8 +8,12 @@ public class Config {
     public String begin_time;
     public Long send_delay;
     public Guide guide;
-    public Data[] custom_data;
-    public List<Data> data = new ArrayList<>();
+    public Roll[] custom_data;
+    public List<Roll> roll = new ArrayList<>();
+
+    public boolean hasCustom() {
+        return custom_data != null;
+    }
 
     public LocalDateTime getDateTime() {
         return LocalDateTime.parse(begin_time);
@@ -18,7 +22,7 @@ public class Config {
     @Override
     public String toString() {
         int total_member = 0;
-        int total_days = data.size() + ((custom_data == null) ? 0 : custom_data.length);
+        int total_days = roll.size() + ((custom_data == null) ? 0 : custom_data.length);
         int total_split_count = 0;
 
         StringBuilder builder = new StringBuilder();
@@ -42,8 +46,8 @@ public class Config {
 
         builder.append("\n");
 
-        if (custom_data != null)
-            for (Data i : custom_data) {
+        if (hasCustom())
+            for (Roll i : custom_data) {
                 builder.append("\n\n日期: ").append(i.date);
                 total_member += i.custom_count;
                 total_split_count += (i.custom_count / 20) + ((i.custom_count % 20 == 0) ? 0 : 1);
@@ -52,7 +56,7 @@ public class Config {
                         .append("\n成員數: ").append(i.custom_count).append('\n');
             }
 
-        for (Data i : data) {
+        for (Roll i : roll) {
             int member_count = i.getMembers().size();
 
             builder.append("\n\n日期: ").append(i.date);

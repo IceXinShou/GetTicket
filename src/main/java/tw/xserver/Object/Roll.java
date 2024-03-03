@@ -1,28 +1,46 @@
 package tw.xserver.Object;
 
+import org.jetbrains.annotations.Nullable;
+import org.jsoup.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-public class Data {
-    private static final Logger LOGGER = LoggerFactory.getLogger(Data.class);
+public class Roll {
+    private static final Logger LOGGER = LoggerFactory.getLogger(Roll.class);
     public String date;
     public Integer custom_count;
     private List<Member> members = new ArrayList<>();
+    private Guide guide;
+    private Connection conn;
 
-    public Data init(String date, int customCount) {
+    public int getSize() {
+        return Objects.requireNonNullElseGet(custom_count, () -> getMembers().size());
+    }
+
+    public Guide getGuide() {
+        return guide;
+    }
+
+    public Connection getConn() {
+        return conn;
+    }
+
+    public void setConn(Connection conn) {
+        this.conn = conn;
+    }
+
+    public Roll init(String date, int customCount) {
         this.date = date;
         this.custom_count = customCount;
         return this;
     }
 
-    public Data init(String date, List<Member> members) {
+    public Roll init(@Nullable Guide guide, String date, List<Member> members) {
+        this.guide = guide;
         this.date = date;
         this.members = members;
         return this;
@@ -78,6 +96,10 @@ public class Data {
 
     @Override
     public String toString() {
+        return String.format("%s [%d]", date.substring(5, 10), members.size());
+    }
+
+    public String toStringAll() {
         StringBuilder builder = new StringBuilder().append(date).append(": ");
 
         try {

@@ -9,7 +9,7 @@ import org.yaml.snakeyaml.error.YAMLException;
 import tw.xserver.Exceptions.BadUserIdFormat;
 import tw.xserver.Exceptions.SameIdOccur;
 import tw.xserver.Object.Config;
-import tw.xserver.Object.Data;
+import tw.xserver.Object.Roll;
 import tw.xserver.Object.Member;
 
 import java.io.File;
@@ -82,9 +82,9 @@ public class FileManager {
     }
 
     public void verify() throws Exception {
-        if (config.custom_data != null) {
+        if (config.hasCustom()) {
             LOGGER.info("verifying custom_data");
-            for (Data i : config.custom_data) {
+            for (Roll i : config.custom_data) {
                 if (i.custom_count == null) {
                     LOGGER.error("unknown count");
                     continue;
@@ -101,7 +101,7 @@ public class FileManager {
             LOGGER.info("there is no setting about custom_data, verify skipped");
         }
 
-        for (Data i : config.data) {
+        for (Roll i : config.roll) {
             Set<String> ids = new HashSet<>();
             for (Member member : i.getMembers()) {
                 // 1. 檢查身分證號合法性

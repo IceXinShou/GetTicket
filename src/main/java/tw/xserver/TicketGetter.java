@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.tidy.Tidy;
 import tw.xserver.Object.Config;
-import tw.xserver.Object.Data;
+import tw.xserver.Object.Roll;
 
 import javax.swing.*;
 import java.io.ByteArrayInputStream;
@@ -19,7 +19,6 @@ import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.*;
 
@@ -28,9 +27,9 @@ import static tw.xserver.GUI.*;
 public class TicketGetter implements Runnable {
     private static final Logger LOGGER = LoggerFactory.getLogger(TicketGetter.class);
     private static final Random random = new Random();
-    private static ConcurrentLinkedQueue<Data> inputQueue;
+    private static ConcurrentLinkedQueue<Roll> inputQueue;
     private static ConcurrentLinkedQueue<String> outputQueue;
-    private static ConcurrentLinkedQueue<Connection> sendReq;
+    private static ConcurrentLinkedQueue<Roll> sendReq;
     private static ExecutorService connector;
     private static ExecutorService areaUpdater;
     private static ScheduledExecutorService awaitSender;
@@ -49,7 +48,7 @@ public class TicketGetter implements Runnable {
         inputQueue = new ConcurrentLinkedQueue<>();
         outputQueue = new ConcurrentLinkedQueue<>();
         sentFailedQueue = new ConcurrentLinkedQueue<>();
-        sendReq = new ConcurrentLinkedQueue<>();
+        sendReq = new ConcurrentLinkedQueue<Roll>();
         areaUpdater = Executors.newSingleThreadExecutor();
         connector = Executors.newSingleThreadExecutor();
         awaitSender = Executors.newScheduledThreadPool(100);
@@ -58,26 +57,27 @@ public class TicketGetter implements Runnable {
         post_success = 0;
         post_fail = 0;
 
-        if (config.custom_data != null)
-            for (Data i : config.custom_data) {
+        if (config.hasCustom()) {
+            for (Roll i : config.custom_data) {
                 int member_count = i.custom_count;
                 LOGGER.debug("date: {}, member: {}", i.date, member_count);
 
                 for (int j = 0; j < member_count; j += 20) {
                     int newSize = Math.min(20, member_count - j);
-                    Data newD = new Data().init(i.date, newSize);
+                    Roll newD = new Roll().init(i.date, newSize);
                     LOGGER.debug("size: {}", newSize);
                     inputQueue.add(newD);
                 }
             }
+        }
 
-        for (Data i : config.data) {
+        for (Roll i : config.roll) {
             int member_count = i.getMembers().size();
             LOGGER.debug("date: {}, member: {}", i.date, member_count);
 
             for (int j = 0; j < member_count; j += 20) {
                 int newSizeEnd = j + Math.min(20, member_count - j);
-                Data newD = new Data().init(i.date, i.getMembers().subList(j, newSizeEnd));
+                Roll newD = new Roll().init(config.guide, i.date, i.getMembers().subList(j, newSizeEnd));
                 LOGGER.debug("range ({}, {}), size: {}, ctx: {}",
                         j, newSizeEnd,
                         newD.getMembers().size(), Arrays.toString(newD.getMembers().toArray()));
@@ -101,17 +101,17 @@ public class TicketGetter implements Runnable {
         }
     }
 
-    private static void awaitSend(Connection connection, int delayInSeconds) {
+    private static void awaitSend(Roll roll, int delayInSeconds) {
         awaitSender.schedule(() -> {
             try {
-                Connection.Response rsp = connection.execute();
+                Connection.Response rsp = roll.getConn().execute();
 
                 LOGGER.info("----------------------------------------");
                 outputQueue.add("----------------------------------------");
 
                 if (rsp.url().toString().contains("OrderComplete")) {
                     outputQueue.add(rsp.url().toString());
-                    LOGGER.info(rsp.url().toString());
+                    LOGGER.info("{}", rsp.url().toString());
                     ++post_success;
                 } else {
                     outputQueue.add("失敗: " + rsp.url().toString());
@@ -199,10 +199,9 @@ public class TicketGetter implements Runnable {
             }
 
             while (!forceStop.get() && !inputQueue.isEmpty()) {
-                Data rawData = inputQueue.peek();
+                Roll roll = inputQueue.peek();
                 String formattedURL = String.format("https://travel.wutai.gov.tw/Signup/CreateOrder/HYCDEMO%s02/%d",
-                        rawData.date.replace("/", ""),
-                        Objects.requireNonNullElseGet(rawData.custom_count, () -> rawData.getMembers().size())
+                        roll.date.replace("/", ""), roll.getSize()
                 );
 
                 LOGGER.info("----------------------------------------");
@@ -211,7 +210,7 @@ public class TicketGetter implements Runnable {
                 try {
                     Connection.Response rsp = Jsoup
                             .connect(formattedURL)
-                            .referrer("https://travel.wutai.gov.tw/Travel/Detail/HYCDEMO/" + rawData.date.replace("/", ""))
+                            .referrer("https://travel.wutai.gov.tw/Travel/Detail/HYCDEMO/" + roll.date.replace("/", ""))
                             .execute();
                     Map<String, String> cookies = rsp.cookies();
                     JsonObject rspJson = JsonParser.parseString(rsp.body()).getAsJsonObject();
@@ -222,28 +221,28 @@ public class TicketGetter implements Runnable {
                             int oid = rspJson.get("oid").getAsInt();
                             String verify = rspJson.get("verify").getAsString();
                             String url = String.format("https://travel.wutai.gov.tw/Signup/Users/%d/%s", oid, verify);
-                            LOGGER.info("OK 成功: {} {}", rawData.date, rawData.getMembers().size());
+                            LOGGER.info("OK 成功: {} [{}]",
+                                    roll.date.substring(5, 10), roll.getSize()
+                            );
                             LOGGER.info("表單連結: {}", url);
 
                             outputQueue.add(String.format("%02d: (%s) [%02d] %s",
-                                    ++get_total,
-                                    rawData.date.substring(5, 10),
-                                    Objects.requireNonNullElseGet(rawData.custom_count, () -> rawData.getMembers().size()),
-                                    url
+                                    ++get_total, roll.date.substring(5, 10), roll.getSize(), url
                             ));
                             inputQueue.poll();
 
-                            if (rawData.custom_count != null) break;
+                            if (roll.custom_count != null) break;
 
-                            if (rawData.parsePostData(config.guide) != null) {
+                            if (roll.parsePostData(config.guide) != null) {
                                 ++post_await;
-                                sendReq.add(Jsoup.connect(url)
+                                roll.setConn(Jsoup.connect(url)
                                         .method(Connection.Method.POST)
                                         .referrer(url)
                                         .cookies(cookies)
-                                        .data(rawData.parsePostData(config.guide))
+                                        .data(roll.parsePostData(config.guide))
                                         .data("id", String.valueOf(rspJson.get("oid").getAsInt()))
                                         .data("Verify", rspJson.get("verify").getAsString()));
+                                sendReq.add(roll);
                             }
 
                             break;
@@ -258,8 +257,8 @@ public class TicketGetter implements Runnable {
                         }
 
                         case NO_QUOTA: {
-                            LOGGER.warn("沒票了!! : {} {}", rawData.date.substring(5, 10), rawData.getMembers().size());
-                            outputQueue.add(String.format("-> -> -> NO QUOTA 沒票了: %s %d", rawData.date.substring(5, 10), rawData.getMembers().size()));
+                            LOGGER.warn("沒票了!! : {} [{}]", roll.date.substring(5, 10), roll.getSize());
+                            outputQueue.add(String.format("-> -> -> NO QUOTA 沒票了: %s [%d]", roll.date.substring(5, 10), roll.getSize()));
                             inputQueue.poll();
                             break;
                         }
