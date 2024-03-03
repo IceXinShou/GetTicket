@@ -10,7 +10,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -29,6 +28,13 @@ public class GUI {
     public static AtomicBoolean forceStop = new AtomicBoolean(false);
 
     public static void main(String[] args) {
+        managerInit();
+
+        if (!manager.config.gui) {
+            start();
+            return;
+        }
+
         frame = new JFrame("搶票大師 (Discord: xs._.b)");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(500, 400);
@@ -94,24 +100,7 @@ public class GUI {
         });
 
         start_btn.addActionListener(event -> {
-            if (manager == null) {
-                managerInit();
-            }
-
-            if (executor != null) {
-                executor.shutdownNow();
-            }
-
-            forceStop.set(false);
-            forceStop_btn.setEnabled(true);
-            if (outputArea.getText().isEmpty()) {
-                outputArea.setText("開始執行，結束前請勿再次按下按鈕！\n");
-            } else {
-                outputArea.setText(outputArea.getText() + "\n\n開始執行，結束前請勿再次按下按鈕！\n");
-            }
-
-            executor = Executors.newSingleThreadExecutor();
-            executor.submit(new TicketGetter(manager.config));
+            start();
         });
 
         sentFail_btn.addActionListener(event -> {
@@ -123,25 +112,23 @@ public class GUI {
                 return;
             }
 
-            Path tempFile;
+            File tempFile;
             try {
-                tempFile = Files.createTempFile("tempHtml", ".html");
+                tempFile = Files.createTempFile("tempHtml", ".html").toFile();
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            File file = tempFile.toFile();
 
             while (!sentFailedQueue.isEmpty()) {
-                // 将 HTML 写入临时文件
-                try (FileWriter writer = new FileWriter(file)) {
+                try (FileWriter writer = new FileWriter(tempFile)) {
                     writer.write(sentFailedQueue.poll());
-                    Desktop.getDesktop().browse(file.toURI());
+                    Desktop.getDesktop().browse(tempFile.toURI());
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
             }
 
-            file.deleteOnExit();
+            tempFile.deleteOnExit();
         });
 
         forceStop_btn.addActionListener(event -> {
@@ -166,6 +153,29 @@ public class GUI {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private static void start() {
+        if (manager == null) {
+            managerInit();
+        }
+
+        if (executor != null) {
+            executor.shutdownNow();
+        }
+
+        if (manager.config.gui) {
+            forceStop.set(false);
+            forceStop_btn.setEnabled(true);
+            if (outputArea.getText().isEmpty()) {
+                outputArea.setText("開始執行，結束前請勿再次按下按鈕！\n");
+            } else {
+                outputArea.setText(outputArea.getText() + "\n\n開始執行，結束前請勿再次按下按鈕！\n");
+            }
+        }
+
+        executor = Executors.newSingleThreadExecutor();
+        executor.submit(new TicketGetter(manager.config));
     }
 
     // ------- GUI Component -------

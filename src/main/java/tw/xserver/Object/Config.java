@@ -7,6 +7,8 @@ import java.util.List;
 public class Config {
     public String begin_time;
     public Long send_delay;
+    public Boolean gui;
+    public Boolean burst;
     public Guide guide;
     public Roll[] custom_data;
     public List<Roll> roll = new ArrayList<>();

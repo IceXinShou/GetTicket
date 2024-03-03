@@ -1,5 +1,7 @@
 begin_time: 2024-03-01T07:59:55
 send_delay: 300
+gui: true
+burst: false
 
 guide:
   contact_name: 測試名

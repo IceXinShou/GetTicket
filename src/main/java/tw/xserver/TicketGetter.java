@@ -48,14 +48,16 @@ public class TicketGetter implements Runnable {
         inputQueue = new ConcurrentLinkedQueue<>();
         outputQueue = new ConcurrentLinkedQueue<>();
         sentFailedQueue = new ConcurrentLinkedQueue<>();
-        sendReq = new ConcurrentLinkedQueue<Roll>();
-        areaUpdater = Executors.newSingleThreadExecutor();
+        sendReq = new ConcurrentLinkedQueue<>();
         connector = Executors.newSingleThreadExecutor();
         awaitSender = Executors.newScheduledThreadPool(100);
         get_total = 0;
         post_await = 0;
         post_success = 0;
         post_fail = 0;
+
+        if (config.gui)
+            areaUpdater = Executors.newSingleThreadExecutor();
 
         if (config.hasCustom()) {
             for (Roll i : config.custom_data) {
@@ -96,8 +98,10 @@ public class TicketGetter implements Runnable {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
-            connector.shutdown();
-            areaUpdater.shutdown();
+            if (!connector.isShutdown())
+                connector.shutdown();
+            if (!areaUpdater.isShutdown())
+                areaUpdater.shutdown();
         }
     }
 
@@ -139,7 +143,7 @@ public class TicketGetter implements Runnable {
                     if (area.getText().isEmpty()) {
                         area.setText(data);
                     } else {
-                        area.setText(area.getText() + "\n" + data);
+                        area.setText(area.getText() + '\n' + data);
                     }
                 }
             LOGGER.info("AreaUpdater shutdown");
@@ -155,6 +159,7 @@ public class TicketGetter implements Runnable {
                 .connect("https://travel.wutai.gov.tw/Travel/QuotaByDate/HYCDEMO/" + date)
                 .referrer("https://travel.wutai.gov.tw/")
                 .execute();
+        System.out.println(rsp.body());
         return !JsonParser.parseString(rsp.body()).getAsJsonArray().isEmpty();
     }
 
@@ -184,8 +189,9 @@ public class TicketGetter implements Runnable {
             }
 
             try {
-                while (countDown.getCount() > 0) {
+                while (!config.burst && countDown.getCount() > 0) {
                     assert inputQueue.peek() != null;
+
                     if (checkTicketAvailable(inputQueue.peek().date.replace('/', '-'))) {
                         LOGGER.info("取得票資訊，開始搶票");
                         break;
