@@ -251,14 +251,10 @@ public class TicketGetter implements Runnable {
                             int oid = rspJson.get("oid").getAsInt();
                             String verify = rspJson.get("verify").getAsString();
                             String url = String.format("https://travel.wutai.gov.tw/Signup/Users/%d/%s", oid, verify);
-                            LOGGER.info("OK 成功: {} [{}]",
-                                    roll.date.substring(5, 10), roll.getSize()
-                            );
+                            LOGGER.info("OK 成功: {}", roll);
                             LOGGER.info("表單連結: {}", url);
 
-                            outputQueue.add(String.format("%02d: (%s) [%02d] %s",
-                                    ++get_total, roll.date.substring(5, 10), roll.getSize(), url
-                            ));
+                            outputQueue.add(String.format("%02d: %s %s", ++get_total, roll, url));
                             inputQueue.poll();
 
                             if (roll.retry) noQuotaDates.add(roll.date);
@@ -288,8 +284,8 @@ public class TicketGetter implements Runnable {
                         }
 
                         case NO_QUOTA: {
-                            LOGGER.warn("沒票了!! : {} [{}]", roll.date.substring(5, 10), roll.getSize());
-                            outputQueue.add(String.format("-> -> -> NO QUOTA 沒票了: %s [%d]", roll.date.substring(5, 10), roll.getSize()));
+                            LOGGER.warn("沒票了!! : {}", roll);
+                            outputQueue.add(String.format("-> -> -> NO QUOTA 沒票了: {}", roll));
 
                             LOGGER.warn("嘗試取得餘票數...");
                             outputQueue.add("嘗試取得餘票數...");
