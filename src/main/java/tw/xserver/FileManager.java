@@ -30,6 +30,7 @@ public class FileManager {
     public Config config;
 
     public FileManager() {
+        new File("./data/").mkdirs();
         File file = new File(ROOT_PATH + "./data/config.yml");
 
         if (!file.exists()) {
@@ -125,8 +126,8 @@ public class FileManager {
                 return null;
             }
 
-            Files.copy(fileInJar, Paths.get(ROOT_PATH + "config.yml"), StandardCopyOption.REPLACE_EXISTING);
-            return new File(ROOT_PATH + "config.yml");
+            Files.copy(fileInJar, Paths.get(ROOT_PATH + "./data/config.yml"), StandardCopyOption.REPLACE_EXISTING);
+            return new File(ROOT_PATH + "./data/config.yml");
         } catch (IOException e) {
             LOGGER.error("read resource failed: {}", e.getMessage());
         }
