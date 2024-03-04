@@ -98,7 +98,7 @@ public class Roll {
 
     @Override
     public String toString() {
-        return String.format("%s [%d]", date.substring(5, 10), members.size());
+        return String.format("(%s) [%d]", date.substring(5, 10), members.size());
     }
 
     public String toStringAll() {
