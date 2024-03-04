@@ -92,9 +92,9 @@ public class XlsxManager {
                                         return;
                                     }
                                 }
+
                                 LOGGER.info("changed: {} -> {}", userId.get(), newId);
                                 userId = Optional.of(newId);
-
                             }
 
                             try {
@@ -110,8 +110,8 @@ public class XlsxManager {
                                 String newBirth;
                                 newBirth = String.format("%2d.%02d.%02d",
                                         new Random().nextInt(16) + 50, // 50 ~ 65
-                                        new Random().nextInt(12) + 1,      // 1 ~ 12
-                                        new Random().nextInt(28) + 1       // 1 ~ 28
+                                        new Random().nextInt(12) + 1,  // 1 ~ 12
+                                        new Random().nextInt(28) + 1   // 1 ~ 28
                                 );
                                 LOGGER.info("changed: {} -> {}", userBirth.get(), newBirth);
                                 userBirth = Optional.of(newBirth);
@@ -119,7 +119,7 @@ public class XlsxManager {
 
                             if (ids.contains(userId.get())) {
                                 String newId;
-                                LOGGER.error("same id occur, try to auto fix...");
+                                LOGGER.warn("same id occur, try to auto fix...");
                                 switch (userId.get().charAt(1)) {
                                     case '1' -> newId = exampleId.getManId();
                                     case '2' -> newId = exampleId.getWomanId();
@@ -128,8 +128,9 @@ public class XlsxManager {
                                         return;
                                     }
                                 }
-                                userId = Optional.of(newId);
+
                                 LOGGER.info("changed: {} -> {}", userId.get(), newId);
+                                userId = Optional.of(newId);
                             }
 
                             ids.add(userId.get());

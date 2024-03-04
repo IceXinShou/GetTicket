@@ -11,11 +11,12 @@ import java.util.*;
 
 public class Roll {
     private static final Logger LOGGER = LoggerFactory.getLogger(Roll.class);
-    public String date;
-    public Integer custom_count;
     private List<Member> members = new ArrayList<>();
     private Guide guide;
     private Connection conn;
+    public String date;
+    public Integer custom_count;
+    public boolean retry = false;
 
     public int getSize() {
         return Objects.requireNonNullElseGet(custom_count, () -> getMembers().size());
@@ -55,8 +56,8 @@ public class Roll {
     }
 
     public Map<String, String> parsePostData(Guide guide) {
-        int member_count = members.size();
-        if (member_count > 20 || getMembers() == null) {
+        int member_count = getSize();
+        if (member_count > 20 || getMembers().isEmpty()) {
             return null;
         }
 
@@ -91,6 +92,7 @@ public class Roll {
             ret.put("EmergencyTel_" + i, guide.contact_tel);
         }
 
+        LOGGER.debug("{} [{}] -> {}", date, member_count, ret);
         return ret;
     }
 

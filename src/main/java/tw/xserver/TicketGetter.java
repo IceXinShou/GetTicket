@@ -1,5 +1,6 @@
 package tw.xserver;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.jsoup.Connection;
@@ -27,13 +28,14 @@ import static tw.xserver.GUI.*;
 public class TicketGetter implements Runnable {
     private static final Logger LOGGER = LoggerFactory.getLogger(TicketGetter.class);
     private static final Random random = new Random();
-    private static ConcurrentLinkedQueue<Roll> inputQueue;
+    private static ConcurrentLinkedDeque<Roll> inputQueue;
     private static ConcurrentLinkedQueue<String> outputQueue;
     private static ConcurrentLinkedQueue<Roll> sendReq;
     private static ExecutorService connector;
     private static ExecutorService areaUpdater;
     private static ScheduledExecutorService awaitSender;
     private static CountDownLatch countDown;
+    private static CopyOnWriteArraySet<String> noQuotaDates;
     private static int get_total;
     private static int post_await;
     private static int post_success;
@@ -45,9 +47,10 @@ public class TicketGetter implements Runnable {
     public TicketGetter(Config config) {
         TicketGetter.config = config;
         countDown = new CountDownLatch(1);
-        inputQueue = new ConcurrentLinkedQueue<>();
+        inputQueue = new ConcurrentLinkedDeque<>();
         outputQueue = new ConcurrentLinkedQueue<>();
         sentFailedQueue = new ConcurrentLinkedQueue<>();
+        noQuotaDates = new CopyOnWriteArraySet<>();
         sendReq = new ConcurrentLinkedQueue<>();
         connector = Executors.newSingleThreadExecutor();
         awaitSender = Executors.newScheduledThreadPool(100);
@@ -159,9 +162,23 @@ public class TicketGetter implements Runnable {
                 .connect("https://travel.wutai.gov.tw/Travel/QuotaByDate/HYCDEMO/" + date)
                 .referrer("https://travel.wutai.gov.tw/")
                 .execute();
-        System.out.println(rsp.body());
         return !JsonParser.parseString(rsp.body()).getAsJsonArray().isEmpty();
     }
+
+    /**
+     * @param date: ex-format "2024-04-01"
+     * @return 0 if ticket is not gettable
+     */
+    private static int getRemainTicketCount(String date) throws IOException {
+        Connection.Response rsp = Jsoup
+                .connect("https://travel.wutai.gov.tw/Travel/QuotaByDate/HYCDEMO/" + date)
+                .referrer("https://travel.wutai.gov.tw/")
+                .execute();
+        JsonArray ary = JsonParser.parseString(rsp.body()).getAsJsonArray();
+        return (ary.isEmpty() ?
+                0 : Math.max(0, 200 - ary.get(1).getAsJsonObject().get("used").getAsInt()));
+    }
+
 
     static class Connector implements Runnable {
         @Override
@@ -206,6 +223,12 @@ public class TicketGetter implements Runnable {
 
             while (!forceStop.get() && !inputQueue.isEmpty()) {
                 Roll roll = inputQueue.peek();
+                if (noQuotaDates.contains(roll.date)) {
+                    LOGGER.warn("no quote, skip requesting: {}", roll.date);
+                    inputQueue.poll();
+                    continue;
+                }
+
                 String formattedURL = String.format("https://travel.wutai.gov.tw/Signup/CreateOrder/HYCDEMO%s02/%d",
                         roll.date.replace("/", ""), roll.getSize()
                 );
@@ -237,7 +260,8 @@ public class TicketGetter implements Runnable {
                             ));
                             inputQueue.poll();
 
-                            if (roll.custom_count != null) break;
+                            if (roll.retry) noQuotaDates.add(roll.date);
+                            if (roll.custom_count != null && roll.getMembers().isEmpty()) break;
 
                             if (roll.parsePostData(config.guide) != null) {
                                 ++post_await;
@@ -265,7 +289,25 @@ public class TicketGetter implements Runnable {
                         case NO_QUOTA: {
                             LOGGER.warn("沒票了!! : {} [{}]", roll.date.substring(5, 10), roll.getSize());
                             outputQueue.add(String.format("-> -> -> NO QUOTA 沒票了: %s [%d]", roll.date.substring(5, 10), roll.getSize()));
-                            inputQueue.poll();
+
+                            LOGGER.warn("嘗試取得餘票數...");
+                            outputQueue.add("嘗試取得餘票數...");
+
+                            int remain = getRemainTicketCount(roll.date);
+                            if (remain > 0) {
+                                LOGGER.warn("可用 {} 張", remain);
+                                outputQueue.add("可用 " + remain + " 張");
+
+                                roll.retry = true;
+                                roll.custom_count = remain;
+                                inputQueue.poll();
+                                inputQueue.addFirst(roll);
+                            } else {
+                                noQuotaDates.add(roll.date);
+                                LOGGER.warn("無");
+                                outputQueue.add("無");
+                            }
+
                             break;
                         }
 
