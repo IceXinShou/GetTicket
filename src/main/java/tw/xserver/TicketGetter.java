@@ -223,11 +223,11 @@ public class TicketGetter implements Runnable {
 
             while (!forceStop.get() && !inputQueue.isEmpty()) {
                 Roll roll = inputQueue.peek();
-                if (noQuotaDates.contains(roll.date)) {
-                    LOGGER.warn("no quote, skip requesting: {}", roll.date);
-                    inputQueue.poll();
-                    continue;
-                }
+//                if (noQuotaDates.contains(roll.date)) {
+//                    LOGGER.warn("no quote, skip requesting: {}", roll.date);
+//                    inputQueue.poll();
+//                    continue;
+//                }
 
                 String formattedURL = String.format("https://travel.wutai.gov.tw/Signup/CreateOrder/HYCDEMO%s02/%d",
                         roll.date.replace("/", ""), roll.getSize()
