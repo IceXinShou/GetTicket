@@ -156,6 +156,8 @@ public class GUI {
     }
 
     private static void start() {
+        start_btn.setEnabled(false);
+
         if (manager == null) {
             managerInit();
         }
@@ -185,7 +187,7 @@ public class GUI {
     private static JPanel panel;
     private static JButton read_btn;
     private static JButton preview_btn;
-    private static JButton start_btn;
+    public static JButton start_btn;
     public static JButton sentFail_btn;
     public static JButton forceStop_btn;
 }

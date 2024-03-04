@@ -189,6 +189,7 @@ public class TicketGetter implements Runnable {
 
                 outputQueue.add("完成");
                 forceStop_btn.setEnabled(false);
+                start_btn.setEnabled(true);
                 countDown.countDown();
                 return;
             }
@@ -303,6 +304,7 @@ public class TicketGetter implements Runnable {
                                 inputQueue.poll();
                                 inputQueue.addFirst(roll);
                             } else {
+                                inputQueue.add(inputQueue.poll());
                                 noQuotaDates.add(roll.date);
                                 LOGGER.warn("無");
                                 outputQueue.add("無");
@@ -359,6 +361,7 @@ public class TicketGetter implements Runnable {
             LOGGER.info("Connector shutdown");
             outputQueue.add("完成");
             forceStop_btn.setEnabled(false);
+            start_btn.setEnabled(true);
             countDown.countDown();
         }
 
